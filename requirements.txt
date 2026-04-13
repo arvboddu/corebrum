@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+websockets
+faster-whisper
+ollama
+watchdog
+pymupdf4llm
+sentence-transformers
+faiss-cpu
+pyaudio
+markitdown
+pydantic
+pydantic-settings

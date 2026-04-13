@@ -1,0 +1,149 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  width: 100%;
+  background: transparent !important;
+  overflow: hidden;
+}
+
+#app-container {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(145deg, rgba(20, 25, 35, 0.85) 0%, rgba(10, 15, 25, 0.95) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+}
+
+.drag-region {
+  width: 100%;
+  height: 36px;
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  padding-left: 14px;
+  cursor: grab;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+  border-radius: 16px 16px 0 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.drag-region:active {
+  cursor: grabbing;
+}
+
+.drag-handle {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  letter-spacing: 2px;
+  pointer-events: none;
+}
+
+#main-panel {
+  width: 100%;
+  height: calc(100% - 36px);
+  display: flex;
+  background: transparent;
+}
+
+#heard-section, #copilot-section {
+  flex: 1;
+  padding: 20px;
+  overflow: hidden;
+}
+
+header {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 3px;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+#heard-content {
+  font-size: 26px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
+  overflow-y: auto;
+  height: calc(100% - 30px);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+#copilot-content {
+  font-size: 20px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.85);
+  overflow-y: auto;
+  height: calc(100% - 30px);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.divider {
+  width: 1px;
+  background: linear-gradient(180deg, 
+    transparent 0%, 
+    rgba(255, 255, 255, 0.08) 20%, 
+    rgba(255, 255, 255, 0.08) 80%, 
+    transparent 100%);
+  margin: 10px 0;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+@keyframes pulse {
+  0% { opacity: 1; text-shadow: 0 0 10px rgba(255, 0, 0, 0.8); }
+  50% { opacity: 0.5; text-shadow: 0 0 20px rgba(255, 0, 0, 0.4); }
+  100% { opacity: 1; text-shadow: 0 0 10px rgba(255, 0, 0, 0.8); }
+}
+
+.pulse-text {
+  color: #ff3333;
+  animation: pulse 1.5s infinite ease-in-out;
+  font-weight: bold;
+}
+
+.heard-block {
+  display: block;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.3s ease;
+}
+
+.heard-word {
+  display: inline;
+}
+
+.heard-final {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 
+    0 0 20px rgba(0, 242, 255, 0.3),
+    inset 0 0 15px rgba(0, 242, 255, 0.1);
+}

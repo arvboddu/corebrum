@@ -1,0 +1,68 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+build/
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test
+coverage/
+.coverage
+htmlcov/
+
+# Runtime data
+runtime-logs/
+runtime-data/
+
+# Electron
+.node-version
+
+# Temporary
+*.tmp
+temp/
+*.bak
+*.backup
+
+# Virtual Cable / Audio
+cable-input/
+cable-output/
+
+# Secrets (never commit)
+*.pem
+*.key
+credentials.json
+secrets/
+
+# Index files (can be regenerated)
+knowledge/.index/
