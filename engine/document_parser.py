@@ -113,8 +113,11 @@ class KnowledgeBase:
         return self.load_index() or self.build_index() > 0
 
     def search(self, query: str, top_k: int = 3) -> list[dict]:
+        if not isinstance(query, str):
+            return []
+
         cleaned_query = query.strip()
-        if not cleaned_query:
+        if not cleaned_query or len(cleaned_query) > 1000:
             return []
 
         if not self.ensure_index() or self.index is None:

@@ -1,50 +1,99 @@
 const heardContent = document.getElementById("heard-content");
 const copilotContent = document.getElementById("copilot-content");
 const appContainer = document.getElementById("app-container");
+const statusIndicator = document.getElementById("status-indicator");
+const heardTitle = document.querySelector('#heard-panel .panel-header, [id="heard"] .panel-header, #heard-content + .panel-header, #heard-title') || document.getElementById("heard-title");
 
-const WS_URL = "ws://127.0.0.1:8001/ws";
-const RECONNECT_INTERVAL = 1000;
+const WS_URL = "ws://localhost:8001/ws/ui";
+const RECONNECT_INTERVAL = 3000;
+const MAX_RECONNECT_ATTEMPTS = 9999;
+const SIGNAL_THRESHOLD = 0.01;
 let socket = null;
-let reconnectTimeout = null;
+let reconnectAttempts = 0;
+let reconnectIntervalId = null;
 let lastMessageTime = 0;
 let lastTranscript = "";
 let systemReady = false;
+let isReconnecting = false;
+let signalLevel = 0;
+let heartbeatTimeout = null;
+
+const DEBUG = false;
+const log = (...args) => DEBUG && console.log(...args);
+
+function updateStatusIndicator(status, message) {
+  const indicator = statusIndicator || appContainer;
+  if (indicator) {
+    if (status === "connected") {
+      indicator.style.border = "2px solid #00ff00";
+    } else if (status === "disconnected") {
+      indicator.style.border = "2px solid #ff0000";
+    } else if (status === "waiting") {
+      indicator.style.border = "2px solid #ffff00";
+    }
+  }
+}
+
+// Auto-Scroll Observer logic
+const scrollObserver = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (heardContent && (mutation.target === heardContent || heardContent.contains(mutation.target))) {
+      heardContent.scrollTop = heardContent.scrollHeight;
+    }
+    if (copilotContent && (mutation.target === copilotContent || copilotContent.contains(mutation.target))) {
+      copilotContent.scrollTop = copilotContent.scrollHeight;
+    }
+  });
+});
+
+scrollObserver.observe(document.getElementById("app-container"), { 
+    childList: true, 
+    subtree: true, 
+    characterData: true 
+});
 
 function connect() {
   const url = WS_URL;
-  console.log("[WS] Attempting connection to:", url);
+  log("[HUD] Attempting WebSocket connection to:", url);
   socket = new WebSocket(url);
 
   socket.onopen = () => {
-    console.log("Connected to Backend!");
+    log("[HUD] ✅ WebSocket OPEN - Connected to Backend!");
+    log("[HUD] 🎧 Ready to receive transcripts and answers");
     reconnectTimeout = null;
-    heardContent.innerHTML = '<div class="heard-block">🟢 LIVE</div>';
-    copilotContent.innerText = "Ready";
+    reconnectAttempts = 0;
+    heardContent.innerHTML = '<div class="heard-block">🟢 CONNECTED</div>';
+    copilotContent.innerText = "Ready - Waiting for interview question...";
     lastMessageTime = Date.now();
     systemReady = true;
+    updateStatusIndicator("connected");
     
     appContainer.style.border = "1px solid rgba(255, 255, 255, 0.15)";
     appContainer.style.boxShadow = "0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05)";
   };
 
   socket.onmessage = (event) => {
-    console.log("Data received:", event.data);
     try {
       const data = JSON.parse(event.data);
+      log("[HUD] 📥 Received:", JSON.stringify(data));
       lastMessageTime = Date.now();
       handleMessage(data);
     } catch (err) {
-      console.error("[WS] JSON parse error:", err, "Raw:", event.data);
+      console.error("[HUD] ❌ JSON parse error:", err, "Raw:", event.data);
     }
   };
 
   socket.onerror = (error) => {
-    console.log("WebSocket Error:", error);
+    console.error("[HUD] ❌ WebSocket Error:", error);
   };
 
-  socket.onclose = () => {
-    console.log("WebSocket Disconnected");
-    scheduleReconnect();
+  socket.onclose = (e) => {
+    log("[HUD] 🔌 WebSocket closed:", e.code, e.reason);
+    updateStatusIndicator("disconnected");
+    socket = null;
+    if (!isReconnecting) {
+      scheduleReconnect();
+    }
   };
 }
 
@@ -68,6 +117,22 @@ function appendPartialText(text) {
   });
   
   scrollToBottom();
+}
+
+function updateHeartbeat() {
+  const heardHeader = document.querySelector('#heard-section header');
+  if (!heardHeader) return;
+  
+  if (signalLevel > 0.01) {
+    heardHeader.style.color = '#ff6666';
+    heardHeader.style.animation = 'pulse 1.5s infinite ease-in-out';
+    
+    if (heartbeatTimeout) clearTimeout(heartbeatTimeout);
+    heartbeatTimeout = setTimeout(() => {
+      heardHeader.style.color = '';
+      heardHeader.style.animation = '';
+    }, 1000); // Keep pulsing for 1s after signal drops to avoid flicker
+  }
 }
 
 function getActiveHeardBlock() {
@@ -94,9 +159,19 @@ function finalizeHeardBlock() {
 
 function scrollToBottom() {
   heardContent.scrollTop = heardContent.scrollHeight;
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+function autoScrollToBottom(element) {
+  if (element) {
+    element.scrollTop = element.scrollHeight;
+    window.scrollTo(0, document.body.scrollHeight);
+  }
 }
 
 function handleMessage(data) {
+  log("[HUD] 📝 Handling message type:", data.type);
+  
   if (data.type === "status") {
     if (data.message && data.message.includes("Listening")) {
       if (!systemReady) {
@@ -104,13 +179,16 @@ function handleMessage(data) {
         heardContent.innerHTML = '<div class="heard-block">🎤 Listening...</div>';
       }
     }
+    log("[HUD] Status:", data.message);
     return;
   }
 
   if (data.type === "transcript") {
     const content = data.content || data.text;
+    log("[HUD] 📄 Transcript:", content);
     if (content && content.trim()) {
       heardContent.innerHTML = '<div class="heard-block heard-final">' + escapeHtml(content.trim()) + '</div>';
+      updateStatusIndicator("waiting");
       scrollToBottom();
     }
     return;
@@ -137,12 +215,35 @@ function handleMessage(data) {
     return;
   }
 
-  if (data.type === "copilot_partial" || data.type === "advice") {
-    const content = data.content;
+  if (data.type === "copilot_partial" || data.type === "copilot_answer" || data.type === "advice") {
+    const content = data.content || data.text;
+    log("[HUD] 🤖 Copilot partial:", content);
     if (content && content.trim()) {
-      copilotContent.innerText += content;
-      copilotContent.scrollTop = copilotContent.scrollHeight;
+      if (copilotContent.innerText === "Ready - Waiting for interview question..." || copilotContent.innerText === "") {
+        copilotContent.innerText = content;
+      } else {
+        copilotContent.innerText += content;
+      }
+      autoScrollToBottom(copilotContent);
     }
+    return;
+  }
+
+  if (data.type === "copilot_final") {
+    log("[HUD] ✅ Copilot answer complete");
+    // Keep the final content as-is
+    return;
+  }
+
+  if (data.type === "heartbeat") {
+    log("[HUD] 💓 Heartbeat received");
+    updateStatusIndicator("connected");
+    return;
+  }
+   
+  if (data.type === "amplitude" || data.type === "signal") {
+    signalLevel = parseFloat(data.value || data.level || 0);
+    updateHeartbeat();
     return;
   }
 }
@@ -154,25 +255,38 @@ function escapeHtml(text) {
 }
 
 function scheduleReconnect() {
-  if (reconnectTimeout) return;
+  if (isReconnecting || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
   
-  heardContent.innerHTML = '<div class="heard-block">🔄 Connecting...</div>';
+  isReconnecting = true;
+  reconnectAttempts++;
+  log(`[HUD] 🔄 Reconnect attempt ${reconnectAttempts} in ${RECONNECT_INTERVAL}ms...`);
+  updateStatusIndicator("disconnected");
   
-  reconnectTimeout = setTimeout(() => {
-    reconnectTimeout = null;
-    connect();
+  reconnectIntervalId = setInterval(() => {
+    log("[HUD] 🔄 Attempting reconnect...");
+    if (!socket || socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING) {
+      connect();
+    } else {
+      clearInterval(reconnectIntervalId);
+      reconnectIntervalId = null;
+      isReconnecting = false;
+      reconnectAttempts = 0;
+    }
   }, RECONNECT_INTERVAL);
 }
 
 window.onload = () => {
-  console.log("HUD Ready - Connecting to 8001...");
+  log("[HUD] 🚀 Corebrum HUD Starting...");
+  log("[HUD] Connecting to backend at:", WS_URL);
+  updateStatusIndicator("waiting");
   connect();
 };
 
 setInterval(() => {
   if (lastMessageTime && Date.now() - lastMessageTime > 15000) {
     if (!heardContent.querySelector(".heard-block")) {
-      heardContent.innerHTML = '<div class="heard-block">Waiting for signal...</div>';
+      heardContent.innerHTML = '<div class="heard-block">⏳ Waiting for audio...</div>';
     }
+    updateStatusIndicator("waiting");
   }
 }, 2000);

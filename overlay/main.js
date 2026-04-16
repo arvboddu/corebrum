@@ -4,8 +4,6 @@ const { execSync } = require("child_process");
 
 try {
   console.log("Cleaning up orphaned processes...");
-  execSync('taskkill /f /im python.exe /t', { stdio: 'ignore' });
-  
   const currentPid = process.pid;
   execSync(`powershell -Command "Get-Process electron -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne ${currentPid} } | Stop-Process -Force"`, { stdio: 'ignore' });
 } catch (e) {
@@ -57,6 +55,10 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, "index.html"));
   
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[RENDERER] ${message}`);
+  });
+
   mainWindow.show();
   console.log("Window created and shown");
 

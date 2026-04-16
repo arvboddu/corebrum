@@ -29,10 +29,50 @@ html, body {
   display: flex;
   align-items: center;
   padding-left: 14px;
+  padding-right: 14px;
+  justify-content: space-between;
   cursor: grab;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
   border-radius: 16px 16px 0 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffff00;
+  box-shadow: 0 0 8px #ffff00;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+.status-dot.connected {
+  background: #00ff00;
+  box-shadow: 0 0 8px #00ff00;
+}
+
+.status-dot.disconnected {
+  background: #ff0000;
+  box-shadow: 0 0 8px #ff0000;
+}
+
+#status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffff00;
+  box-shadow: 0 0 8px #ffff00;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+#status-indicator.connected {
+  background: #00ff00;
+  box-shadow: 0 0 8px #00ff00;
+}
+
+#status-indicator.disconnected {
+  background: #ff0000;
+  box-shadow: 0 0 8px #ff0000;
 }
 
 .drag-region:active {
