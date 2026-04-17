@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import faiss
+from faster_whisper import WhisperModel
 from groq import Groq
 import numpy as np
 import pydantic_settings
@@ -310,50 +311,91 @@ MIN_TRANSCRIBE_INTERVAL = (
 )
 
 
+def _run_whisper(model, audio_data):
+    import tempfile
+    import os
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as f:
+        f.write(audio_data)
+        temp_path = f.name
+    try:
+        segments, info = model.transcribe(temp_path, language="en")
+        result = ([s.text.strip() for s in segments], info)
+    finally:
+        os.unlink(temp_path)
+    return result
+
+
 async def groq_transcription_worker():
-    logger.info("[GROQ_WORKER] Starting Whisper transcription worker")
-    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    logger.info("[WHISPER_WORKER] Loading faster-whisper model...")
     SAMPLE_RATE = 16000
 
-    # Buffer for accumulating audio (aim for ~5 seconds = 80000 bytes)
+    # Try different model sizes in order of preference
+    WHISPER_MODELS = ["base", "small", "medium", "tiny"]
+    whisper_model = None
+
+    for model_size in WHISPER_MODELS:
+        try:
+            whisper_model = WhisperModel(model_size, device="cpu", compute_type="int8")
+            logger.info(f"[WHISPER_WORKER] Loaded faster-whisper-{model_size}")
+            break
+        except Exception as e:
+            logger.warning(f"[WHISPER_WORKER] Failed to load {model_size}: {e}")
+            continue
+
+    if not whisper_model:
+        logger.error("[WHISPER_WORKER] No faster-whisper model available")
+        return
+
+    # Keep Groq client for LLM (not STT)
+    groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+    if groq_client:
+        logger.info("[WHISPER_WORKER] Groq client available for LLM")
+
+    # Buffer for accumulating audio
     audio_buffer = bytearray()
-    CHUNK_DURATION_MS = 5000  # Process every 5 seconds
-    BYTES_PER_SECOND = SAMPLE_RATE * 2  # 16-bit mono
+    CHUNK_DURATION_MS = 5000
+    BYTES_PER_SECOND = SAMPLE_RATE * 2
     TARGET_BUFFER_SIZE = (CHUNK_DURATION_MS * BYTES_PER_SECOND) // 1000
+    MAX_QUEUE_SIZE = 10
 
     while True:
         try:
+            # Drop oldest chunk if queue exceeds limit
+            queue_size = transcript_queue.qsize()
+            if queue_size > MAX_QUEUE_SIZE:
+                try:
+                    await transcript_queue.get()
+                    logger.warning(
+                        f"[WHISPER_WORKER] Dropped oldest, queue was {queue_size}"
+                    )
+                except asyncio.QueueEmpty:
+                    pass
+
             audio_data = await transcript_queue.get()
             receive_time = time.time()
             data_len = len(audio_data)
-            logger.info(f"[GROQ_WORKER] Got {data_len} bytes from queue")
+            logger.info(f"[WHISPER_WORKER] Got {data_len} bytes (queue: {queue_size})")
 
-            # Add to buffer
             audio_buffer.extend(audio_data)
 
             # Only process if we have enough audio (at least 3 seconds)
             if len(audio_buffer) < (3 * BYTES_PER_SECOND):
                 logger.info(
-                    f"[GROQ_WORKER] Buffering: {len(audio_buffer)}/{TARGET_BUFFER_SIZE} bytes"
+                    f"[WHISPER_WORKER] Buffering: {len(audio_buffer)}/{TARGET_BUFFER_SIZE}"
                 )
                 continue
 
-            logger.info(f"[GROQ_WORKER] Processing buffer: {len(audio_buffer)} bytes")
+            logger.info(f"[WHISPER_WORKER] Processing: {len(audio_buffer)} bytes")
 
-            if not client:
-                logger.warning("[GROQ_WORKER] No Groq API key configured")
-                await asyncio.sleep(1)
-                continue
-
-            # Convert PCM16 bytes to proper WAV format
+            # Convert PCM16 to WAV
             pcm_data = bytes(audio_buffer)
-            audio_buffer.clear()  # Clear buffer after processing
+            audio_buffer.clear()
 
             wav_buffer = io.BytesIO()
-
             with wave.open(wav_buffer, "wb") as wav_file:
                 wav_file.setnchannels(1)
-                wav_file.setsampwidth(2)  # 16-bit = 2 bytes
+                wav_file.setsampwidth(2)
                 wav_file.setframerate(SAMPLE_RATE)
                 import struct
 
@@ -361,16 +403,20 @@ async def groq_transcription_worker():
                 wav_file.writeframes(struct.pack(f"{len(samples)}h", *samples))
 
             wav_data = wav_buffer.getvalue()
-            logger.info(f"[GROQ_WORKER] Created WAV: {len(wav_data)} bytes")
+            logger.info(f"[WHISPER_WORKER] WAV: {len(wav_data)} bytes")
 
-            response = client.audio.transcriptions.create(
-                model="whisper-large-v3",
-                file=("audio.wav", wav_data, "audio/wav"),
-                response_format="json",
+            # Use faster-whisper (runs in thread to avoid blocking)
+            segments, info = await asyncio.to_thread(
+                _run_whisper, whisper_model, wav_data
             )
-            text = response.text.strip().lower()
+            text = " ".join(segments).strip().lower()
+
+            if not text:
+                logger.info("[WHISPER_WORKER] No speech detected")
+                continue
+
             transcribe_time = time.time()
-            logger.info(f"[GROQ_WORKER] Whisper returned: '{text}'")
+            logger.info(f"[WHISPER_WORKER] Transcript: '{text}'")
 
             if text and not any(f in text for f in HALLUCINATION_EXTENDED):
                 timestamp = (
@@ -659,6 +705,20 @@ async def websocket_ui(websocket: WebSocket):
         await connection_manager.disconnect(websocket, "ui")
 
 
+async def send_periodic_ping(websocket: WebSocket, interval: float = 10.0):
+    """Send periodic pings to keep connection alive and prevent timeout."""
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                await websocket.send_text(json.dumps({"type": "ping"}))
+                logger.debug("[WS_AUDIO] Sent ping to keepalive")
+            except Exception:
+                break
+    except asyncio.CancelledError:
+        pass
+
+
 @app.websocket("/ws/audio")
 async def websocket_audio(websocket: WebSocket):
     chunk_counter = 0
@@ -666,6 +726,8 @@ async def websocket_audio(websocket: WebSocket):
 
     await connection_manager.connect(websocket, "audio")
     logger.info(f"[WS_AUDIO] Chrome Extension connected & accepted")
+
+    ping_task = asyncio.create_task(send_periodic_ping(websocket, 10.0))
 
     try:
         while True:
@@ -689,6 +751,8 @@ async def websocket_audio(websocket: WebSocket):
                         )
                         print("=" * 60 + "\n")
                         logger.info("[PM_DASHBOARD] Handshake confirmed!")
+                    elif data.get("type") == "pong":
+                        logger.debug("[WS_AUDIO] Received pong from client")
                 except json.JSONDecodeError:
                     logger.warning(f"[WS_AUDIO] Non-JSON text: {text_data[:100]}")
 
@@ -717,6 +781,12 @@ async def websocket_audio(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info("[WS_AUDIO] Chrome Extension disconnected")
+    finally:
+        ping_task.cancel()
+        try:
+            await ping_task
+        except asyncio.CancelledError:
+            pass
         await connection_manager.disconnect(websocket, "audio")
 
 
