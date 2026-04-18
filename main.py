@@ -64,6 +64,16 @@ HALLUCINATION_FILTER = frozenset(
     {"thank you", "thanks for watching", "subscribe", "watching", "amara.org", "bye"}
 )
 
+
+def clean_transcript(text: str) -> str:
+    """Remove filler words and clean up transcript."""
+    words = text.split()
+    cleaned = [w for w in words if w.lower() not in FILLER_WORDS]
+    text = " ".join(cleaned)
+    text = " ".join(text.split())
+    return text
+
+
 HALLUCINATION_EXTENDED = frozenset(
     {
         "thank you.",
@@ -88,6 +98,25 @@ HALLUCINATION_EXTENDED = frozenset(
         "bye.",
         "please like",
         "like and subscribe",
+    }
+)
+
+FILLER_WORDS = frozenset(
+    {
+        "um",
+        "uh",
+        "mm",
+        "hm",
+        "hmm",
+        "er",
+        "ah",
+        "like",
+        "you know",
+        "basically",
+        "actually",
+        "literally",
+        "so yeah",
+        "i mean",
     }
 )
 
@@ -410,6 +439,7 @@ async def groq_transcription_worker():
                 _run_whisper, whisper_model, wav_data
             )
             text = " ".join(segments).strip().lower()
+            text = clean_transcript(text)
 
             if not text:
                 logger.info("[WHISPER_WORKER] No speech detected")
@@ -472,15 +502,19 @@ async def process_brain(transcript: str):
 
     try:
         client = Groq(api_key=GROQ_API_KEY)
-        context = knowledge_base.search_context(transcript, top_k=3)
+        context = knowledge_base.search_context(transcript, top_k=5)
 
-        system_prompt = """You are an Interview Copilot helping during a job interview. 
-Provide helpful, concise suggestions for what the interviewee could say next.
-Focus on: key points to mention, relevant examples, and professional phrasing.
-Keep responses to 2-3 bullet points max."""
+        persona = "You are an Interview Copilot helping during a job interview. Be practical and actionable."
+        star_method = "For behavioral questions (like 'tell me about a time...'), use STAR: Situation → Task → Action → Result with metrics."
+
+        system_prompt = f"""{persona}
+IMPORTANT: The transcript is from a live interview; ignore minor phonetic errors and prioritize professional context. Aggressively infer the intended meaning. Ignore filler words like "um", "uh", "like", "basically".
+{star_method}
+Use specific examples from the provided context that match what the interviewer is asking about.
+Provide 2-3 concise bullet points starting with action verbs."""
 
         if context:
-            system_prompt += f"\n\nRelevant knowledge base context:\n{context}"
+            system_prompt += f"\n\nResume/JD Context:\n{context}"
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -524,11 +558,19 @@ async def process_brain_ollama(transcript: str):
     """Use local Ollama for copilot responses - no API rate limits"""
     try:
         ollama_url = "http://localhost:11434/api/generate"
+        context = knowledge_base.search_context(transcript, top_k=5)
 
-        system_prompt = """You are an Interview Copilot helping during a job interview. 
-Provide helpful, concise suggestions for what the interviewee could say next.
-Focus on: key points to mention, relevant examples, and professional phrasing.
-Keep responses to 2-3 bullet points max. Start directly with the suggestions."""
+        persona = "You are an Interview Copilot helping during a job interview. Be practical and actionable."
+        star_method = "For behavioral questions (like 'tell me about a time...'), use STAR: Situation → Task → Action → Result with metrics."
+
+        system_prompt = f"""{persona}
+IMPORTANT: The transcript is from a live interview; ignore minor phonetic errors and prioritize professional context. Aggressively infer the intended meaning. Ignore filler words like "um", "uh", "like", "basically".
+{star_method}
+Use specific examples from the provided context that match what the interviewer is asking about.
+Provide 2-3 concise bullet points starting with action verbs."""
+
+        if context:
+            system_prompt += f"\n\nResume/JD Context:\n{context}"
 
         payload = {
             "model": "llama3.2:3b",
@@ -572,12 +614,30 @@ async def heartbeat_worker():
         )
 
 
+async def buffer_flush_worker():
+    """Flush audio queue every 30 seconds to prevent memory leaks."""
+    while True:
+        await asyncio.sleep(30)
+        try:
+            queue_size = transcript_queue.qsize()
+            if queue_size > 0:
+                logger.info(f"[BUFFER_FLUSH] Clearing {queue_size} chunks from queue")
+                while not transcript_queue.empty():
+                    try:
+                        transcript_queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+        except Exception as e:
+            logger.warning(f"[BUFFER_FLUSH] Error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("[LIFESPAN] Starting...")
     if GROQ_API_KEY:
         asyncio.create_task(groq_transcription_worker())
     asyncio.create_task(heartbeat_worker())
+    asyncio.create_task(buffer_flush_worker())
     if knowledge_base.load_index():
         logger.info(
             f"[RAG] Indexed {len(knowledge_base.metadata)} chunks from knowledge base"
@@ -657,6 +717,61 @@ async def index_context(
         return {"status": "error", "message": str(e)}
 
 
+def extract_keywords(text: str, min_count: int = 2) -> list[str]:
+    """Extract key technical terms/keywords from context for grounding."""
+    import re
+
+    words = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", text)
+    common = {
+        "the",
+        "and",
+        "for",
+        "with",
+        "that",
+        "this",
+        "from",
+        "have",
+        "has",
+        "are",
+        "was",
+        "were",
+        "been",
+        "being",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "need",
+        "work",
+        "job",
+        "year",
+        "years",
+        "experience",
+        "team",
+        "lead",
+        "manage",
+        "project",
+        "skill",
+        "skillset",
+        "product",
+        "service",
+        "company",
+        "client",
+        "customer",
+        "role",
+        "position",
+        "responsibility",
+        "requirement",
+    }
+    filtered = [w for w in words if w.lower() not in common]
+    return list(dict.fromkeys(filtered))[:min_count]
+
+
 @app.post("/api/generate-answer")
 async def generate_answer(request: GenerateAnswerRequest):
     if not GROQ_API_KEY:
@@ -664,11 +779,30 @@ async def generate_answer(request: GenerateAnswerRequest):
 
     try:
         client = Groq(api_key=GROQ_API_KEY)
-        context = knowledge_base.search_context(request.transcript, top_k=3)
+        context = knowledge_base.search_context(request.transcript, top_k=5)
 
-        system_prompt = f"You are an Interview Copilot. Role: {request.role or 'general'}. Seniority: {request.seniority or 'mid'}. Give 3 concise bullet points."
+        keywords = extract_keywords(context, 2) if context else []
+        keyword_instruction = (
+            f"IMPORTANT: Reference these specific keywords in your answer: {', '.join(keywords)}."
+            if keywords
+            else ""
+        )
+
+        role = request.role or "general"
+        seniority = request.seniority or "mid"
+
+        persona = f"You are a {seniority} {role} with 10 years of experience. Give practical, real-world answers."
+
+        star_method = "For behavioral questions, use STAR method: Situation (brief context), Task (your responsibility), Action (what you did), Result (outcome + metrics)."
+
+        system_prompt = f"""{persona}
+{star_method}
+{keyword_instruction}
+The candidate's resume and job description are provided in the context below. Use specific examples from the resume that match the job requirements.
+Give 2-3 concise bullet points starting with action verbs."""
+
         if context:
-            system_prompt += f"\n\nContext:\n{context}"
+            system_prompt += f"\n\nResume/JD Context:\n{context}"
 
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -780,7 +914,7 @@ async def websocket_audio(websocket: WebSocket):
                 await transcript_queue.put(data)
 
     except WebSocketDisconnect:
-        logger.info("[WS_AUDIO] Chrome Extension disconnected")
+        logger.info("[WS_AUDIO] Chrome Extension disconnected - scheduling reconnect")
     finally:
         ping_task.cancel()
         try:
@@ -788,6 +922,13 @@ async def websocket_audio(websocket: WebSocket):
         except asyncio.CancelledError:
             pass
         await connection_manager.disconnect(websocket, "audio")
+        logger.info("[WS_AUDIO] Notifying UI of reconnection needed")
+        await connection_manager.broadcast_to_ui(
+            {
+                "type": "reconnect_needed",
+                "message": "STT disconnected, please restart capture",
+            }
+        )
 
 
 if __name__ == "__main__":

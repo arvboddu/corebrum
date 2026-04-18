@@ -54,17 +54,20 @@ echo Starting Electron HUD...
 start "" npm.cmd start
 
 echo.
-echo Copilot launch requested.
+echo Copilot is starting...
 echo.
-echo Audio routing reminder:
-echo 1. Open Windows Settings ^> System ^> Sound ^> Volume mixer.
-echo 2. Set your Zoom or Teams meeting output device to CABLE Input ^(VB-Audio Virtual Cable^).
-echo 3. Keep your regular speakers or headphones as your main listening device if needed.
-echo 4. The backend listens on CABLE Output ^(VB-Audio Virtual Cable^) and forwards answers to the HUD.
+echo Setup instructions:
+echo 1. Open Chrome and load the extension from corebrum-extension\ folder:
+echo    - Go to chrome://extensions/
+echo    - Enable "Developer mode"
+echo    - Click "Load unpacked" and select the corebrum-extension folder
+echo 2. Click the extension icon and click "Start Capture"
+echo    - Grant microphone permissions when prompted
+echo 3. The HUD will display transcribed audio and AI suggestions
 echo.
 echo If the HUD does not respond, check:
 echo - runtime-logs\backend.out.log
 echo - runtime-logs\backend.err.log
-echo - that Ollama is open and llama3.1 is installed
+echo - that Ollama is running with llama3.2:3b model installed
 
 endlocal

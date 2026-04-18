@@ -18,7 +18,7 @@ let isReconnecting = false;
 let signalLevel = 0;
 let heartbeatTimeout = null;
 
-const DEBUG = false;
+const DEBUG = true;
 const log = (...args) => DEBUG && console.log(...args);
 
 function updateStatusIndicator(status, message) {
