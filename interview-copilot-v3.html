@@ -1481,7 +1481,7 @@ const ST = {
   accumulated: '',         // buffered final text
   silenceTimer: null,
   liveNodes: {},            // utterance_id → DOM element map (Fault 6)
-  processedIds: new Set(),   // Idempotency: finalized utterance IDs
+  processedIds: new Set(),   // Idempotency: finalized utterance IDs (seenFinals)
   // audio
   audioCtx: null,
   analyser: null,
