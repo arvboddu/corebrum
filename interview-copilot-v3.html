@@ -1481,7 +1481,9 @@ const ST = {
   accumulated: '',         // buffered final text
   silenceTimer: null,
   liveNodes: {},            // utterance_id → DOM element map (Fault 6)
-  processedIds: new Set(),   // Idempotency: finalized utterance IDs (seenFinals)
+  processedIds: new Set(),   // Idempotency: finalized utterance IDs
+  finalizedIds: new Set(),   // Gatekeeper: finalized IDs to drop late interims
+  speakerLocks: {},      // 'YOU' vs 'INTERVIEWER' lock per ID
   // audio
   audioCtx: null,
   analyser: null,
@@ -1936,23 +1938,39 @@ function connectBackendWS() {
           console.log('[WS-UI] Received:', msg);
 
           if (msg.type === 'transcript') {
-            // Idempotency: skip if already processed
-            const uid = msg.utterance_id || `uid-${Date.now()}`;
-            if (ST.processedIds.has(uid) && !msg.is_final) {
-              console.log('[WS-UI] Skipping already-finalized:', uid);
+            // Empty ID Guard: skip if no utterance_id
+            if (!msg.utterance_id || msg.utterance_id.trim() === '') {
+              console.warn('[WS-UI] Missing utterance_id, discarding:', msg);
               return;
+            }
+            
+            const uid = msg.utterance_id;
+            
+            // Drop Post-Final Interims: skip if ID already finalized
+            if (ST.finalizedIds.has(uid) && !msg.is_final) {
+              console.log('[WS-UI] Dropping post-final interim:', uid);
+              return;
+            }
+            
+            // Speaker Lock: preserve INTERVIEWER identity
+            let who = msg.who || 'YOU';
+            if (ST.speakerLocks[uid] === 'INTERVIEWER') {
+              who = 'INTERVIEWER';
+            } else if (who === 'INTERVIEWER') {
+              ST.speakerLocks[uid] = 'INTERVIEWER';
             }
             
             if (!msg.is_final) {
               // Interim: create or update by utterance_id
               if (!ST.liveNodes[uid]) {
-                ST.liveNodes[uid] = addTxEntry(msg.text, 'live', msg.who);
+                ST.liveNodes[uid] = addTxEntry(msg.text, 'live', who);
               } else {
                 const bubble = ST.liveNodes[uid].querySelector('.tx-bubble');
                 if (bubble) bubble.innerHTML = `${esc(msg.text)}<span class="blink-cursor"></span>`;
               }
             } else {
-              // Final: mark as processed, cleanup liveEl
+              // Final: mark as finalized, cleanup liveEl
+              ST.finalizedIds.add(uid);
               ST.processedIds.add(uid);
               // Interim Cleanup: finalize and nullify
               const el = ST.liveNodes[uid];
@@ -1963,7 +1981,7 @@ function connectBackendWS() {
                 if (typeTag) { typeTag.textContent = 'FINAL'; typeTag.className = 'tx-type final'; }
                 delete ST.liveNodes[uid];
               } else {
-                addTxEntry(msg.text, 'final', msg.who);
+                addTxEntry(msg.text, 'final', who);
               }
               ST.liveEl = null;  // Clear reference
             }
