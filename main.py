@@ -737,11 +737,14 @@ Provide 2-3 concise bullet points starting with action verbs."""
 
 import httpx
 
+OLLAMA_URL = "http://localhost:11434"
+OLLAMA_API = f"{OLLAMA_URL}/api/generate"
+
 
 async def process_brain_ollama(transcript: str):
     """Fault 8: Parallel RAG + LLM with 400ms race window"""
     try:
-        ollama_url = "http://localhost:11434/api/generate"
+        ollama_url = OLLAMA_API
         RAG_TIMEOUT = 0.4  # 400ms max wait for RAG
 
         def sync_rag_search():
@@ -839,9 +842,29 @@ async def buffer_flush_worker():
             logger.warning(f"[BUFFER_FLUSH] Error: {e}")
 
 
-@asynccontextmanager
+async def check_ollama_health() -> bool:
+    """Health check for Ollama - returns True if online."""
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            response = await client.head(OLLAMA_URL)
+            if response.status_code < 400:
+                logger.info(f"[OLLAMA] Health check passed: {OLLAMA_URL}")
+                return True
+    except Exception as e:
+        logger.warning(f"[OLLAMA] Offline: Run $env:OLLAMA_ORIGINS='*'; ollama serve")
+    return False
+
+
 async def lifespan(app: FastAPI):
     logger.info("[LIFESPAN] Starting...")
+
+    # Check Ollama availability
+    ollama_online = await check_ollama_health()
+    if not ollama_online:
+        logger.warning(
+            "[OLLAMA] Not available at startup. AI copilot will fail until Ollama is started."
+        )
+
     asyncio.create_task(groq_transcription_worker())
     asyncio.create_task(heartbeat_worker())
     asyncio.create_task(buffer_flush_worker())
