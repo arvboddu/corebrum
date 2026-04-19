@@ -1480,6 +1480,7 @@ const ST = {
   liveEl: null,            // current interim DOM element
   accumulated: '',         // buffered final text
   silenceTimer: null,
+  liveNodes: {},            // utterance_id → DOM element map (Fault 6)
   // audio
   audioCtx: null,
   analyser: null,
@@ -1914,8 +1915,82 @@ function connectBackendWS() {
       resolve();
     };
 
+    // Fault 5: Exponential backoff reconnect for UI
+    let reconnectDelay = 1000;
+    const MAX_RECONNECT_DELAY = 15000;
+
+    function connectUI() {
+      ST.wsUi = new WebSocket(`${CFG.backendWsUrl}/ws/ui`);
+      
+      ST.wsUi.onopen = () => {
+        console.log('[WS/UI] Connected');
+        reconnectDelay = 1000;  // reset on success
+        uiReady = true;
+        maybeResolve();
+      };
+      
+      ST.wsUi.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          console.log('[WS-UI] Received:', msg);
+
+          if (msg.type === 'transcript') {
+            // Fault 6: utterance_id for stable bubbles
+            const uid = msg.utterance_id || `uid-${Date.now()}`;
+            if (!msg.is_final) {
+              // Interim: create or update by utterance_id
+              if (!ST.liveNodes[uid]) {
+                ST.liveNodes[uid] = addTxEntry(msg.text, 'live', msg.who);
+              } else {
+                const bubble = ST.liveNodes[uid].querySelector('.tx-bubble');
+                if (bubble) bubble.innerHTML = `${esc(msg.text)}<span class="blink-cursor"></span>`;
+              }
+            } else {
+              // Final: replace interim or create new
+              const el = ST.liveNodes[uid];
+              if (el) {
+                const bubble = el.querySelector('.tx-bubble');
+                const typeTag = el.querySelector('.tx-type');
+                if (bubble) bubble.textContent = msg.text;
+                if (typeTag) { typeTag.textContent = 'FINAL'; typeTag.className = 'tx-type final'; }
+                delete ST.liveNodes[uid];
+              } else {
+                addTxEntry(msg.text, 'final', msg.who);
+              }
+            }
+            // Accumulate for LLM
+            ST.accumulated += `${msg.text || ''} `;
+            detectQuestion(ST.accumulated);
+            if (ST.accumulated.trim().length > 12) {
+              clearTimeout(ST.silenceTimer);
+              ST.silenceTimer = setTimeout(() => {
+                flushToLLM(ST.accumulated.trim());
+                ST.accumulated = '';
+              }, 2500);
+            }
+            return;
+          }
+
+          handleBackendMessage(msg);
+        } catch (err) { console.error('[WS] Parse error:', err); }
+      };
+      
+      ST.wsUi.onclose = () => {
+        console.log(`[WS/UI] Disconnected. Reconnecting in ${reconnectDelay}ms...`);
+        setTimeout(() => {
+          reconnectDelay = Math.min(reconnectDelay * 1.5, MAX_RECONNECT_DELAY);
+          connectUI();
+        }, reconnectDelay);
+      };
+      
+      ST.wsUi.onerror = (e) => {
+        console.error('[WS] UI error:', e);
+        ST.wsUi.close();
+      };
+    }
+
+    connectUI();
     ST.wsAudio = new WebSocket(`${CFG.backendWsUrl}/ws/audio`);
-    ST.wsUi = new WebSocket(`${CFG.backendWsUrl}/ws/ui`);
 
     ST.wsAudio.onopen = () => {
       console.log('[WS] Audio connected');

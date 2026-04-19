@@ -6,9 +6,10 @@ import os
 import struct
 import threading
 import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from dotenv import load_dotenv
 
@@ -71,6 +72,56 @@ def clean_transcript(text: str) -> str:
     text = " ".join(cleaned)
     text = " ".join(text.split())
     return text
+
+
+def levenshtein_distance(a: str, b: str) -> float:
+    """Calculate Levenshtein similarity (0.0 to 1.0). Returns 1.0 for identical strings."""
+    if not a and not b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+
+    a = a.lower().strip()
+    b = b.lower().strip()
+
+    if a == b:
+        return 1.0
+
+    len_a, len_b = len(a), len(b)
+    if abs(len_a - len_b) > max(len_a, len_b) * 0.5:
+        return 0.0
+
+    prev_row = list(range(len_b + 1))
+    curr_row = [0] * (len_b + 1)
+
+    for i in range(1, len_a + 1):
+        curr_row[0] = i
+        for j in range(1, len_b + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            curr_row[j] = min(
+                curr_row[j - 1] + 1, prev_row[j] + 1, prev_row[j - 1] + cost
+            )
+        prev_row, curr_row = curr_row, prev_row
+
+    distance = prev_row[len_b]
+    max_len = max(len_a, len_b)
+    return 1.0 - (distance / max_len) if max_len > 0 else 1.0
+
+
+# Transcript debouncer state
+transcript_history: List[str] = []
+MAX_HISTORY = 3
+
+
+def is_duplicate_transcript(text: str) -> bool:
+    """Check if text is >85% similar to any of last 3 messages."""
+    if not text or not transcript_history:
+        return False
+
+    for prev in transcript_history[-MAX_HISTORY:]:
+        if levenshtein_distance(text, prev) > 0.85:
+            return True
+    return False
 
 
 HALLUCINATION_EXTENDED = frozenset(
@@ -249,6 +300,8 @@ class KnowledgeBase:
         self.index: Optional[faiss.IndexFlatIP] = None
         self.metadata: list[DocumentChunk] = []
         self.embedder: Optional[SentenceTransformer] = None
+        self.resume_summary: str = ""
+        self.has_resume_summary: bool = False
 
     def build_index(self, chunks: list[DocumentChunk]) -> int:
         INDEX_DIR.mkdir(parents=True, exist_ok=True)
@@ -407,6 +460,7 @@ async def groq_transcription_worker():
 
     # Buffer for accumulating audio
     audio_buffer = bytearray()
+    current_utterance_id = str(uuid.uuid4())
     CHUNK_DURATION_MS = 5000
     BYTES_PER_SECOND = SAMPLE_RATE * 2
     SILENCE_FLUSH_SECONDS = 1
@@ -516,6 +570,7 @@ async def groq_transcription_worker():
 
             interim_payload = {
                 "type": "transcript",
+                "utterance_id": current_utterance_id,
                 "who": "YOU",
                 "text": text,
                 "is_final": False,
@@ -574,15 +629,27 @@ async def groq_transcription_worker():
 
                 transcript_payload = {
                     "type": "transcript",
+                    "utterance_id": current_utterance_id,
                     "who": inferred_speaker,
                     "text": text,
                     "is_final": True,
                 }
 
-                connection_manager.broadcast_task("ui", transcript_payload)
-                await connection_manager.broadcast_to_ui(transcript_payload)
+                # Transcript Debouncer: skip if >85% similar to last 3 messages
+                if is_duplicate_transcript(text):
+                    logger.info(f"[DEBOUNCER] Skipping duplicate: '{text[:50]}...'")
+                else:
+                    # Add to history (keep last 3)
+                    transcript_history.append(text)
+                    if len(transcript_history) > MAX_HISTORY:
+                        transcript_history.pop(0)
 
-                logger.info(f"[HUD_RELAY] Transcript broadcast complete")
+                    connection_manager.broadcast_task("ui", transcript_payload)
+                    await connection_manager.broadcast_to_ui(transcript_payload)
+                    logger.info(f"[HUD_RELAY] Transcript broadcast complete")
+
+                    # Generate new utterance_id for next speech
+                    current_utterance_id = str(uuid.uuid4())
 
                 # Use Ollama for copilot (local, no rate limits)
                 words = text.split()
@@ -659,10 +726,26 @@ import httpx
 
 
 async def process_brain_ollama(transcript: str):
-    """Use local Ollama for copilot responses - no API rate limits"""
+    """Fault 8: Parallel RAG + LLM with 400ms race window"""
     try:
         ollama_url = "http://localhost:11434/api/generate"
-        context = knowledge_base.search_context(transcript, top_k=5)
+        RAG_TIMEOUT = 0.4  # 400ms max wait for RAG
+
+        def sync_rag_search():
+            """Synchronous RAG search - runs in thread pool"""
+            raw_results = knowledge_base.search(transcript, top_k=5)
+            has_high_score = any(r.get("score", 0) > 0.5 for r in raw_results)
+            if has_high_score:
+                return knowledge_base.search_context(transcript, top_k=5)
+            elif (
+                hasattr(knowledge_base, "resume_summary")
+                and knowledge_base.resume_summary
+            ):
+                return knowledge_base.resume_summary
+            return ""
+
+        # Fire RAG in background thread (Fault 8: Parallel RAG)
+        rag_task = asyncio.create_task(asyncio.to_thread(sync_rag_search))
 
         persona = "You are an Interview Copilot helping during a job interview. Be practical and actionable."
         star_method = "For behavioral questions (like 'tell me about a time...'), use STAR: Situation → Task → Action → Result with metrics."
@@ -672,6 +755,16 @@ IMPORTANT: The transcript is from a live interview; ignore minor phonetic errors
 {star_method}
 Use specific examples from the provided context that match what the interviewer is asking about.
 Provide 2-3 concise bullet points starting with action verbs."""
+
+        # Wait up to 400ms for RAG
+        try:
+            context = await asyncio.wait_for(rag_task, timeout=RAG_TIMEOUT)
+        except asyncio.TimeoutError:
+            context = ""  # RAG not ready
+            logger.info("[RAG] Timeout - proceeding without context")
+        except Exception as e:
+            logger.warning(f"[RAG] Error: {e}")
+            context = ""
 
         if context:
             system_prompt += f"\n\nResume/JD Context:\n{context}"
@@ -688,9 +781,7 @@ Provide 2-3 concise bullet points starting with action verbs."""
         if response.status_code == 200:
             result = response.json()
             full_response = result.get("response", "No response")
-
             logger.info(f"[OLLAMA] Response generated: {len(full_response)} chars")
-
             await connection_manager.broadcast(
                 "ui", {"type": "copilot_partial", "text": full_response}
             )
@@ -705,9 +796,6 @@ Provide 2-3 concise bullet points starting with action verbs."""
 
     except Exception as e:
         logger.error(f"[OLLAMA] Error: {e}")
-        import traceback
-
-        logger.error(f"[OLLAMA] Traceback: {traceback.format_exc()}")
         await connection_manager.broadcast(
             "ui", {"type": "copilot_final", "text": f"Ollama error: {str(e)}"}
         )
@@ -748,6 +836,14 @@ async def lifespan(app: FastAPI):
         logger.info(
             f"[RAG] Indexed {len(knowledge_base.metadata)} chunks from knowledge base"
         )
+        # Build resume summary for cold start fallback
+        if knowledge_base.metadata:
+            summary_parts = [c.text[:200] for c in knowledge_base.metadata[:3]]
+            knowledge_base.resume_summary = "\n\n".join(summary_parts)
+            knowledge_base.has_resume_summary = bool(knowledge_base.resume_summary)
+            logger.info(
+                f"[RAG] Cold start summary prepared ({len(knowledge_base.resume_summary)} chars)"
+            )
     yield
     logger.info("[LIFESPAN] Shutting down...")
 
@@ -969,12 +1065,29 @@ async def send_periodic_ping(websocket: WebSocket, interval: float = 10.0):
 @app.websocket("/ws/audio")
 async def websocket_audio(websocket: WebSocket):
     chunk_counter = 0
+    last_byte_time = time.time()
+    audio_timeout_seconds = 5.0
     logger.info(f"[WS_AUDIO] WebSocket opening - preparing to accept...")
 
     await connection_manager.connect(websocket, "audio")
     logger.info(f"[WS_AUDIO] Chrome Extension connected & accepted")
 
     ping_task = asyncio.create_task(send_periodic_ping(websocket, 10.0))
+
+    # Audio heartbeat monitor
+    async def audio_heartbeat_monitor():
+        nonlocal last_byte_time
+        while True:
+            await asyncio.sleep(1.0)
+            if time.time() - last_byte_time > audio_timeout_seconds:
+                logger.warning("[WS_AUDIO] No audio data for 5s - sending alert")
+                await connection_manager.broadcast(
+                    "ui",
+                    {
+                        "type": "status",
+                        "text": "WARNING: No audio data detected. Re-share tab with audio.",
+                    },
+                )
 
     try:
         while True:
@@ -1025,6 +1138,7 @@ async def websocket_audio(websocket: WebSocket):
                     logger.debug(f"[WS_AUDIO] Queuing {data_len} bytes (VAD bypassed)")
 
                 await transcript_queue.put(data)
+                last_byte_time = time.time()  # Reset timer on new data
 
     except WebSocketDisconnect:
         logger.info("[WS_AUDIO] Chrome Extension disconnected - scheduling reconnect")
