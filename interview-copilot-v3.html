@@ -1481,6 +1481,7 @@ const ST = {
   accumulated: '',         // buffered final text
   silenceTimer: null,
   liveNodes: {},            // utterance_id → DOM element map (Fault 6)
+  processedIds: new Set(),   // Idempotency: finalized utterance IDs
   // audio
   audioCtx: null,
   analyser: null,
@@ -1935,8 +1936,13 @@ function connectBackendWS() {
           console.log('[WS-UI] Received:', msg);
 
           if (msg.type === 'transcript') {
-            // Fault 6: utterance_id for stable bubbles
+            // Idempotency: skip if already processed
             const uid = msg.utterance_id || `uid-${Date.now()}`;
+            if (ST.processedIds.has(uid) && !msg.is_final) {
+              console.log('[WS-UI] Skipping already-finalized:', uid);
+              return;
+            }
+            
             if (!msg.is_final) {
               // Interim: create or update by utterance_id
               if (!ST.liveNodes[uid]) {
@@ -1946,7 +1952,9 @@ function connectBackendWS() {
                 if (bubble) bubble.innerHTML = `${esc(msg.text)}<span class="blink-cursor"></span>`;
               }
             } else {
-              // Final: replace interim or create new
+              // Final: mark as processed, cleanup liveEl
+              ST.processedIds.add(uid);
+              // Interim Cleanup: finalize and nullify
               const el = ST.liveNodes[uid];
               if (el) {
                 const bubble = el.querySelector('.tx-bubble');
@@ -1957,6 +1965,7 @@ function connectBackendWS() {
               } else {
                 addTxEntry(msg.text, 'final', msg.who);
               }
+              ST.liveEl = null;  // Clear reference
             }
             // Accumulate for LLM
             ST.accumulated += `${msg.text || ''} `;
@@ -1969,6 +1978,18 @@ function connectBackendWS() {
               }, 2500);
             }
             return;
+          }
+          
+          // Signal Guard: LLM Busy/Timeout indicator
+          if (msg.type === 'copilot_final') {
+            const isLLMBusy = msg.text && (
+              msg.text.toLowerCase().includes('llm busy') || 
+              msg.text.toLowerCase().includes('timeout') ||
+              msg.text.toLowerCase().includes('unavailable')
+            );
+            if (isLLMBusy) {
+              showToast('LLM is busy. Transcript still active.', 'warn');
+            }
           }
 
           handleBackendMessage(msg);
@@ -2550,6 +2571,25 @@ function toast(msg, type='') {
 // ═══════════════════════════════════════════
 //  UTILITIES
 // ═══════════════════════════════════════════
+function showToast(msg, type = 'info') {
+  const existing = document.getElementById('toast-notification');
+  if (existing) existing.remove();
+  
+  const toast = document.createElement('div');
+  toast.id = 'toast-notification';
+  toast.className = `toast toast-${type}`;
+  toast.style.cssText = `
+    position: fixed; top: 20px; right: 20px; z-index: 9999;
+    padding: 12px 20px; border-radius: 8px; font-size: 14px;
+    background: ${type === 'warn' ? '#ff9800' : '#4caf50'}; color: white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: fadeIn 0.3s ease;
+    max-width: 300px; word-wrap: break-word;
+  `;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.remove(); }, 4000);
+}
+
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
