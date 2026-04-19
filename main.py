@@ -468,6 +468,8 @@ async def groq_transcription_worker():
     MIN_AUDIO_SIZE = MIN_AUDIO_SECONDS * BYTES_PER_SECOND
     TARGET_BUFFER_SIZE = (CHUNK_DURATION_MS * BYTES_PER_SECOND) // 1000
     MAX_QUEUE_SIZE = 10
+    last_sent_text = ""
+    current_transcript_buffer = ""
 
     # Deduplication
     last_transcript = ""
@@ -635,14 +637,22 @@ async def groq_transcription_worker():
                     "is_final": True,
                 }
 
-                # Transcript Debouncer: skip if >85% similar to last 3 messages
-                if is_duplicate_transcript(text):
-                    logger.info(f"[DEBOUNCER] Skipping duplicate: '{text[:50]}...'")
+                # 4. Last Sent Text Check: skip exactly same as previous broadcast
+                if text == last_sent_text:
+                    logger.info(
+                        f"[DEBOUNCER] Skipping identical to last sent: '{text}'"
+                    )
+                elif is_duplicate_transcript(text):
+                    logger.info(f"[DEBOUNCER] Skipping >85% similar: '{text[:50]}...'")
                 else:
                     # Add to history (keep last 3)
                     transcript_history.append(text)
                     if len(transcript_history) > MAX_HISTORY:
                         transcript_history.pop(0)
+
+                    # 5. Buffer Reset: clear after final
+                    current_transcript_buffer = ""
+                    last_sent_text = text
 
                     connection_manager.broadcast_task("ui", transcript_payload)
                     await connection_manager.broadcast_to_ui(transcript_payload)
@@ -651,7 +661,7 @@ async def groq_transcription_worker():
                     # Generate new utterance_id for next speech
                     current_utterance_id = str(uuid.uuid4())
 
-                # Use Ollama for copilot (local, no rate limits)
+                # 6. Non-Blocking LLM Call with try/except
                 words = text.split()
                 conversation_history.append(text)
 
@@ -660,6 +670,9 @@ async def groq_transcription_worker():
                     await process_brain_ollama(text)
                 except Exception as e:
                     logger.error(f"[GROQ_WORKER] Ollama failed: {e}")
+                    await connection_manager.broadcast(
+                        "ui", {"type": "copilot_final", "text": "LLM Busy..."}
+                    )
 
         except Exception as e:
             logger.error(f"[GROQ_WORKER] Error: {e}")
