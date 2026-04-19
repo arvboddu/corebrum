@@ -45,7 +45,7 @@ class Settings(pydantic_settings.BaseSettings):
     cors_origins: list[str] = ["*"]
     audio_sample_rate: int = 16000
     silence_threshold: float = 0.25
-    heartbeat_interval: int = 15
+    heartbeat_interval: int = 5
 
     class Config:
         extra = "ignore"
@@ -1204,4 +1204,6 @@ async def websocket_audio(websocket: WebSocket):
 
 if __name__ == "__main__":
     logger.info(f"[SERVER] Starting on port {settings.port}")
-    uvicorn.run(app, host="0.0.0.0", port=settings.port, log_level="info")
+    uvicorn.run(
+        app, host="0.0.0.0", port=settings.port, log_level="info", timeout_keep_alive=60
+    )
