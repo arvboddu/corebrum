@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Interview Copilot — Meeting Mode</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════
@@ -2100,31 +2101,75 @@ function setupAudioAnalyser(stream) {
 }
 
 // ═══════════════════════════════════════════
-//  AUDIO TO BACKEND — stream PCM to /ws/audio
+//  AUDIO TO BACKEND — stream PCM to /ws/audio (using AudioWorklet)
 // ═══════════════════════════════════════════
-function setupAudioToBackend() {
+async function setupAudioToBackend() {
   if (!ST.audioCtx || !ST.analyser) return;
   
-  const bufferSize = 4096;
-  const processor = ST.audioCtx.createScriptProcessor(bufferSize, 1, 1);
-  
-  processor.onaudioprocess = (e) => {
-    if (!ST.capturing || !CFG.useBackend) return;
+  try {
+    // Check if we have a stream to work with
+    const stream = ST.tabStream || ST.micStream;
+    if (!stream) return;
     
-    const inputData = e.inputBuffer.getChannelData(0);
-    const pcmData = new Int16Array(inputData.length);
+    // Register AudioWorklet inline
+    const workletCode = `
+      class PCMProcessor extends AudioWorkletProcessor {
+        process(inputs, outputs, parameters) {
+          const input = inputs[0];
+          if (input && input.length > 0) {
+            const channelData = input[0];
+            const pcmData = new Int16Array(channelData.length);
+            for (let i = 0; i < channelData.length; i++) {
+              pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(channelData[i] * 32768)));
+            }
+            this.port.postMessage(pcmData.buffer);
+          }
+          return true;
+        }
+      }
+      registerProcessor('pcm-processor', PCMProcessor);
+    `;
     
-    for (let i = 0; i < inputData.length; i++) {
-      pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32768)));
-    }
+    const blob = new Blob([workletCode], { type: 'application/javascript' });
+    const workletUrl = URL.createObjectURL(blob);
     
-    sendAudioChunk(pcmData.buffer);
-  };
-  
-  const source = ST.audioCtx.createMediaStreamSource(ST.tabStream || ST.micStream);
-  source.connect(processor);
-  processor.connect(ST.audioCtx.destination);
-  ST._audioProcessor = processor;
+    await ST.audioCtx.audioWorklet.addModule(workletUrl);
+    
+    const pcmNode = new AudioWorkletNode(ST.audioCtx, 'pcm-processor');
+    
+    pcmNode.port.onmessage = (e) => {
+      if (ST.capturing && CFG.useBackend) {
+        sendAudioChunk(e.data);
+      }
+    };
+    
+    const source = ST.audioCtx.createMediaStreamSource(stream);
+    source.connect(pcmNode);
+    pcmNode.connect(ST.audioCtx.destination);
+    
+    ST._audioProcessor = { node: pcmNode, url: workletUrl };
+    
+  } catch (e) {
+    console.warn('AudioWorklet not supported, falling back to deprecated API:', e);
+    // Fallback to deprecated ScriptProcessor
+    const bufferSize = 4096;
+    const processor = ST.audioCtx.createScriptProcessor(bufferSize, 1, 1);
+    
+    processor.onaudioprocess = (e) => {
+      if (!ST.capturing || !CFG.useBackend) return;
+      const inputData = e.inputBuffer.getChannelData(0);
+      const pcmData = new Int16Array(inputData.length);
+      for (let i = 0; i < inputData.length; i++) {
+        pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(inputData[i] * 32768)));
+      }
+      sendAudioChunk(pcmData.buffer);
+    };
+    
+    const source = ST.audioCtx.createMediaStreamSource(ST.tabStream || ST.micStream);
+    source.connect(processor);
+    processor.connect(ST.audioCtx.destination);
+    ST._audioProcessor = processor;
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -2138,7 +2183,15 @@ function stopCapture() {
   if (ST.recognition) { try { ST.recognition.stop(); } catch(e){} ST.recognition = null; }
   if (ST.tabStream) { ST.tabStream.getTracks().forEach(t=>t.stop()); ST.tabStream = null; }
   if (ST.micStream) { ST.micStream.getTracks().forEach(t=>t.stop()); ST.micStream = null; }
-  if (ST._audioProcessor) { ST._audioProcessor.disconnect(); ST._audioProcessor = null; }
+  if (ST._audioProcessor) { 
+    if (ST._audioProcessor.node) {
+      ST._audioProcessor.node.disconnect();
+      if (ST._audioProcessor.url) URL.revokeObjectURL(ST._audioProcessor.url);
+    } else {
+      ST._audioProcessor.disconnect();
+    }
+    ST._audioProcessor = null; 
+  }
   if (ST.audioCtx)  { ST.audioCtx.close(); ST.audioCtx = null; ST.analyser = null; }
   if (ST.wsAudio) { ST.wsAudio.close(); ST.wsAudio = null; }
 
