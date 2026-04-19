@@ -1,7 +1,9 @@
 import asyncio
 import json
 import logging
+import math
 import os
+import struct
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -20,6 +22,7 @@ import pydantic_settings
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
@@ -38,11 +41,7 @@ class Settings(pydantic_settings.BaseSettings):
     groq_api_key: str = ""
     gemini_api_key: str = ""
     port: int = 8001
-    cors_origins: list[str] = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8001",
-    ]
+    cors_origins: list[str] = ["*"]
     audio_sample_rate: int = 16000
     silence_threshold: float = 0.25
     heartbeat_interval: int = 15
@@ -304,7 +303,8 @@ class KnowledgeBase:
             normalize_embeddings=True,
         ).astype("float32")
 
-        distances, indices = self.index.search(query_emb, top_k)
+        k = top_k
+        distances, indices = self.index.search(query_emb, k)
         results = []
         for score, idx in zip(distances[0], indices[0]):
             if 0 <= idx < len(self.metadata):
@@ -355,6 +355,32 @@ def _run_whisper(model, audio_data):
     return result
 
 
+async def _stream_groq_chunks(stream):
+    queue: asyncio.Queue[object] = asyncio.Queue()
+    sentinel = object()
+
+    def worker():
+        try:
+            for chunk in stream:
+                asyncio.run_coroutine_threadsafe(queue.put(chunk), loop)
+        except Exception as exc:
+            asyncio.run_coroutine_threadsafe(queue.put(exc), loop)
+        finally:
+            asyncio.run_coroutine_threadsafe(queue.put(sentinel), loop)
+
+    loop = asyncio.get_running_loop()
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+
+    while True:
+        item = await queue.get()
+        if item is sentinel:
+            break
+        if isinstance(item, Exception):
+            raise item
+        yield item
+
+
 async def groq_transcription_worker():
     logger.info("[WHISPER_WORKER] Loading faster-whisper model...")
     SAMPLE_RATE = 16000
@@ -376,17 +402,57 @@ async def groq_transcription_worker():
         logger.error("[WHISPER_WORKER] No faster-whisper model available")
         return
 
-    # Keep Groq client for LLM (not STT)
-    groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
-    if groq_client:
+    if GROQ_API_KEY:
         logger.info("[WHISPER_WORKER] Groq client available for LLM")
 
     # Buffer for accumulating audio
     audio_buffer = bytearray()
     CHUNK_DURATION_MS = 5000
     BYTES_PER_SECOND = SAMPLE_RATE * 2
+    SILENCE_FLUSH_SECONDS = 1
+    MIN_AUDIO_SECONDS = SILENCE_FLUSH_SECONDS
+    MIN_AUDIO_SIZE = MIN_AUDIO_SECONDS * BYTES_PER_SECOND
     TARGET_BUFFER_SIZE = (CHUNK_DURATION_MS * BYTES_PER_SECOND) // 1000
     MAX_QUEUE_SIZE = 10
+
+    # Deduplication
+    last_transcript = ""
+    last_transcript_time = 0.0
+    REPEAT_THRESHOLD = 0.9  # 90% similarity
+    HALLUCINATION_SILENCE = frozenset(
+        {"thank you very much.", "of anybody.", "thank you.", "thanks."}
+    )
+    silence_repeat_count = 0
+
+    def is_similar(a: str, b: str) -> bool:
+        """Check if two strings are 90% similar."""
+        if not a or not b:
+            return False
+        a = a.lower().strip()
+        b = b.lower().strip()
+        if a == b:
+            return True
+        # Simple word overlap check
+        words_a = set(a.split())
+        words_b = set(b.split())
+        if not words_a or not words_b:
+            return False
+        overlap = len(words_a & words_b) / max(len(words_a), len(words_b))
+        return overlap >= REPEAT_THRESHOLD
+
+    def detect_voice_activity(audio_data: bytes) -> tuple[bool, float]:
+        """Simple VAD: check if audio has enough energy above silence threshold."""
+        if len(audio_data) < 2:
+            return False, 0.0
+        try:
+            samples = struct.unpack(f"{len(audio_data) // 2}h", audio_data)
+            # Calculate RMS
+            rms = sum(s * s for s in samples) / len(samples)
+            rms = math.sqrt(rms)
+            # Threshold for voice activity (adjust as needed)
+            return rms > 500, rms  # ~3% of max (32767)
+        except:
+            return True, 0.0  # Default to processing if VAD fails
 
     while True:
         try:
@@ -406,18 +472,24 @@ async def groq_transcription_worker():
             data_len = len(audio_data)
             logger.info(f"[WHISPER_WORKER] Got {data_len} bytes (queue: {queue_size})")
 
+            # VAD: skip chunks with no voice activity
+            has_speech, speech_level = detect_voice_activity(audio_data)
+            if not has_speech:
+                logger.info("[WHISPER_WORKER] No voice activity, skipping chunk")
+                continue
+            logger.info(f"[AUDIO] Speech detected (Level: {speech_level:.1f})")
+
             audio_buffer.extend(audio_data)
 
-            # Only process if we have enough audio (at least 3 seconds)
-            if len(audio_buffer) < (3 * BYTES_PER_SECOND):
+            # Only process if we have enough audio (at least 1 second)
+            if len(audio_buffer) < MIN_AUDIO_SIZE:
                 logger.info(
-                    f"[WHISPER_WORKER] Buffering: {len(audio_buffer)}/{TARGET_BUFFER_SIZE}"
+                    f"[WHISPER_WORKER] Buffering: {len(audio_buffer)}/{MIN_AUDIO_SIZE}"
                 )
                 continue
 
             logger.info(f"[WHISPER_WORKER] Processing: {len(audio_buffer)} bytes")
 
-            # Convert PCM16 to WAV
             pcm_data = bytes(audio_buffer)
             audio_buffer.clear()
 
@@ -426,15 +498,12 @@ async def groq_transcription_worker():
                 wav_file.setnchannels(1)
                 wav_file.setsampwidth(2)
                 wav_file.setframerate(SAMPLE_RATE)
-                import struct
-
                 samples = struct.unpack(f"{len(pcm_data) // 2}h", pcm_data)
                 wav_file.writeframes(struct.pack(f"{len(samples)}h", *samples))
 
             wav_data = wav_buffer.getvalue()
             logger.info(f"[WHISPER_WORKER] WAV: {len(wav_data)} bytes")
 
-            # Use faster-whisper (runs in thread to avoid blocking)
             segments, info = await asyncio.to_thread(
                 _run_whisper, whisper_model, wav_data
             )
@@ -444,6 +513,40 @@ async def groq_transcription_worker():
             if not text:
                 logger.info("[WHISPER_WORKER] No speech detected")
                 continue
+
+            interim_payload = {
+                "type": "transcript",
+                "who": "YOU",
+                "text": text,
+                "is_final": False,
+            }
+            connection_manager.broadcast_task("ui", interim_payload)
+
+            # 1. Last Message Check: skip if identical within 1 second
+            current_time = time.time()
+            if text == last_transcript and (current_time - last_transcript_time) < 1.0:
+                logger.info(f"[WHISPER_WORKER] Skipping duplicate < 1s: '{text}'")
+                continue
+
+            # 2. Silence Suppression: ignore repeating hallucinations
+            silence_phrase = text.strip().lower()
+            if silence_phrase in HALLUCINATION_SILENCE:
+                silence_repeat_count += 1
+                if silence_repeat_count > 2:
+                    logger.info(
+                        f"[WHISPER_WORKER] Skipping silence hallucination: '{text}'"
+                    )
+                    continue
+            else:
+                silence_repeat_count = 0
+
+            # 3. Regular deduplication
+            if is_similar(text, last_transcript):
+                logger.info(f"[WHISPER_WORKER] Skipping similar: '{text}'")
+                continue
+
+            last_transcript = text
+            last_transcript_time = current_time
 
             transcribe_time = time.time()
             logger.info(f"[WHISPER_WORKER] Transcript: '{text}'")
@@ -462,18 +565,21 @@ async def groq_transcription_worker():
                     f"[BROADCAST] UI connections: {len(connection_manager.active_connections['ui'])}"
                 )
 
-                # Explicit direct broadcast to UI
+                inferred_speaker = (
+                    "INTERVIEWER"
+                    if any(qw in text.lower().split() for qw in QUESTION_WORDS)
+                    or "?" in text
+                    else "YOU"
+                )
+
                 transcript_payload = {
                     "type": "transcript",
-                    "content": text,
-                    "timestamp": timestamp,
-                    "latency_ms": latency_ms,
+                    "who": inferred_speaker,
+                    "text": text,
+                    "is_final": True,
                 }
 
-                # Use thread-safe task
                 connection_manager.broadcast_task("ui", transcript_payload)
-
-                # Also do direct broadcast to ensure it goes through
                 await connection_manager.broadcast_to_ui(transcript_payload)
 
                 logger.info(f"[HUD_RELAY] Transcript broadcast complete")
@@ -481,8 +587,6 @@ async def groq_transcription_worker():
                 # Use Ollama for copilot (local, no rate limits)
                 words = text.split()
                 conversation_history.append(text)
-
-                recent_text = " ".join(conversation_history[-10:])
 
                 logger.info(f"[GROQ_WORKER] Words: {len(words)}, calling Ollama...")
                 try:
@@ -531,23 +635,23 @@ Provide 2-3 concise bullet points starting with action verbs."""
         )
 
         full_response = ""
-        async for chunk in stream:
+        async for chunk in _stream_groq_chunks(stream):
             if chunk.choices and chunk.choices[0].delta.content:
                 content = chunk.choices[0].delta.content
                 full_response += content
                 await connection_manager.broadcast(
-                    "ui", {"type": "copilot_partial", "content": content}
+                    "ui", {"type": "copilot_partial", "text": content}
                 )
 
         await connection_manager.broadcast(
-            "ui", {"type": "copilot_final", "content": full_response}
+            "ui", {"type": "copilot_final", "text": full_response}
         )
         logger.info(f"[BRAIN] Response generated: {len(full_response)} chars")
 
     except Exception as e:
         logger.error(f"[BRAIN] Error: {e}")
         await connection_manager.broadcast(
-            "ui", {"type": "copilot_final", "content": "Analyzing..."}
+            "ui", {"type": "copilot_final", "text": "Analyzing..."}
         )
 
 
@@ -588,21 +692,24 @@ Provide 2-3 concise bullet points starting with action verbs."""
             logger.info(f"[OLLAMA] Response generated: {len(full_response)} chars")
 
             await connection_manager.broadcast(
-                "ui", {"type": "copilot_partial", "content": full_response}
+                "ui", {"type": "copilot_partial", "text": full_response}
             )
             await connection_manager.broadcast(
-                "ui", {"type": "copilot_final", "content": full_response}
+                "ui", {"type": "copilot_final", "text": full_response}
             )
         else:
             logger.error(f"[OLLAMA] Error: {response.status_code}")
             await connection_manager.broadcast(
-                "ui", {"type": "copilot_final", "content": "Service unavailable"}
+                "ui", {"type": "copilot_final", "text": "Service unavailable"}
             )
 
     except Exception as e:
         logger.error(f"[OLLAMA] Error: {e}")
+        import traceback
+
+        logger.error(f"[OLLAMA] Traceback: {traceback.format_exc()}")
         await connection_manager.broadcast(
-            "ui", {"type": "copilot_final", "content": "Ollama not available"}
+            "ui", {"type": "copilot_final", "text": f"Ollama error: {str(e)}"}
         )
 
 
@@ -610,7 +717,7 @@ async def heartbeat_worker():
     while True:
         await asyncio.sleep(settings.heartbeat_interval)
         await connection_manager.broadcast(
-            "ui", {"type": "heartbeat", "time": time.time()}
+            "ui", {"type": "heartbeat", "text": str(time.time())}
         )
 
 
@@ -634,8 +741,7 @@ async def buffer_flush_worker():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("[LIFESPAN] Starting...")
-    if GROQ_API_KEY:
-        asyncio.create_task(groq_transcription_worker())
+    asyncio.create_task(groq_transcription_worker())
     asyncio.create_task(heartbeat_worker())
     asyncio.create_task(buffer_flush_worker())
     if knowledge_base.load_index():
@@ -814,11 +920,11 @@ Give 2-3 concise bullet points starting with action verbs."""
         )
 
         async def generate():
-            for chunk in response:
+            async for chunk in _stream_groq_chunks(response):
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
 
-        return generate()
+        return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
     except Exception as e:
         logger.error(f"[GENERATE] Error: {e}")
         return {"error": str(e)}
@@ -827,14 +933,21 @@ Give 2-3 concise bullet points starting with action verbs."""
 @app.websocket("/ws/ui")
 async def websocket_ui(websocket: WebSocket):
     await connection_manager.connect(websocket, "ui")
-    await websocket.send_json(
-        {"type": "status", "message": "Connected to Corebrum HUD"}
-    )
+    await websocket.send_json({"type": "status", "text": "Connected to Corebrum HUD"})
     print("[WS_UI] HUD CONNECTED - Ready to receive transcripts!")
     logger.info("[WS_UI] HUD connected - ready for transcripts")
     try:
         while True:
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+                if msg.get("type") == "question":
+                    transcript = msg.get("content", "")
+                    if transcript:
+                        logger.info(f"[WS_UI] Received question: {transcript[:50]}...")
+                        await process_brain_ollama(transcript)
+            except json.JSONDecodeError:
+                logger.warning(f"[WS_UI] Invalid JSON: {data}")
     except WebSocketDisconnect:
         await connection_manager.disconnect(websocket, "ui")
 
@@ -926,7 +1039,7 @@ async def websocket_audio(websocket: WebSocket):
         await connection_manager.broadcast_to_ui(
             {
                 "type": "reconnect_needed",
-                "message": "STT disconnected, please restart capture",
+                "text": "STT disconnected, please restart capture",
             }
         )
 

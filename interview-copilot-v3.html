@@ -7,35 +7,37 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════
-   DESIGN SYSTEM — Liquid Glass
-   Deep cosmos + frosted glass surfaces
-   Neon accents bleeding through ice panels
+   DESIGN SYSTEM — Glossy Glass
+   Ultra-transparent frosted glass with glossy reflections
 ═══════════════════════════════════════════ */
 :root {
   /* deep space base — stays opaque behind glass layers */
-  --bg:          #04060c;
-  --bg2:         #060a14;
+  --bg:          #030508;
 
-  /* glass surfaces — semi-transparent with blur */
-  --glass:       rgba(12, 20, 40, 0.45);
-  --glass2:      rgba(8, 14, 30, 0.55);
-  --glass3:      rgba(16, 28, 54, 0.35);
-  --glass-solid: rgba(10, 16, 32, 0.82);
+  /* glass surfaces — HIGHLY transparent with stronger blur */
+  --glass:       rgba(15, 25, 45, 0.25);
+  --glass2:      rgba(10, 20, 40, 0.3);
+  --glass3:      rgba(20, 35, 60, 0.2);
+  --glass-solid: rgba(12, 20, 38, 0.5);
+
+  /* glossy shine overlay */
+  --glass-shine: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%, rgba(255,255,255,0.05) 100%);
+  --glass-highlight: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 40%);
 
   /* borders — luminous hairlines */
-  --border:      rgba(80, 140, 220, 0.12);
-  --border2:     rgba(80, 160, 240, 0.22);
-  --border3:     rgba(100, 200, 255, 0.35);
-  --border-hi:   rgba(160, 230, 255, 0.5);
+  --border:      rgba(120, 180, 255, 0.15);
+  --border2:     rgba(140, 200, 255, 0.25);
+  --border3:     rgba(180, 230, 255, 0.4);
+  --border-hi:   rgba(200, 255, 255, 0.6);
 
   /* neon accents */
-  --cyan:        #00f0d4;
-  --cyan-dim:    rgba(0,240,212,0.12);
-  --cyan-glow:   rgba(0,240,212,0.06);
-  --cyan-shine:  rgba(0,240,212,0.25);
+  --cyan:        #00f0ff;
+  --cyan-dim:    rgba(0,240,255,0.1);
+  --cyan-glow:   rgba(0,240,255,0.15);
+  --cyan-shine:  rgba(0,240,255,0.3);
   --blue:        #4da6ff;
-  --blue-dim:    rgba(77,166,255,0.12);
-  --blue-glow:   rgba(77,166,255,0.06);
+  --blue-dim:    rgba(77,166,255,0.1);
+  --blue-glow:   rgba(77,166,255,0.2);
   --amber:       #ffcc44;
   --amber-dim:   rgba(255,204,68,0.1);
   --red:         #ff4466;
@@ -44,10 +46,10 @@
   --green-dim:   rgba(0,255,170,0.08);
 
   /* text */
-  --text:        rgba(220, 240, 255, 0.92);
-  --text-mid:    rgba(140, 180, 220, 0.7);
-  --text-low:    rgba(80, 120, 170, 0.55);
-  --text-xlow:   rgba(50, 80, 120, 0.35);
+  --text:        rgba(230, 245, 255, 0.95);
+  --text-mid:    rgba(160, 200, 230, 0.75);
+  --text-low:    rgba(100, 150, 200, 0.6);
+  --text-xlow:   rgba(70, 110, 160, 0.4);
 
   /* typography */
   --mono:        'IBM Plex Mono', monospace;
@@ -58,9 +60,9 @@
   --r-sm:        7px;
   --r-lg:        16px;
 
-  /* glossy surface recipe */
-  --gloss-blur:  blur(18px) saturate(1.6);
-  --gloss-blur-sm: blur(10px) saturate(1.4);
+  /* glossy surface recipe - stronger blur for more glass effect */
+  --gloss-blur:  blur(24px) saturate(1.8);
+  --gloss-blur-sm: blur(14px) saturate(1.5);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -121,12 +123,13 @@ body::after {
   gap: 12px;
   padding: 0 16px;
   height: 52px;
-  border-bottom: 1px solid var(--border2);
-  background: var(--glass-solid);
+  border-bottom: 1px solid var(--border);
+  background: var(--glass);
   backdrop-filter: var(--gloss-blur);
   -webkit-backdrop-filter: var(--gloss-blur);
   flex-shrink: 0;
-  box-shadow: 0 1px 0 var(--border-hi), 0 4px 32px rgba(0,0,0,0.5);
+  position: relative;
+  z-index: 10;
 }
 
 /* topbar gloss highlight */
@@ -135,9 +138,20 @@ body::after {
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(160,220,255,0.6), rgba(0,240,212,0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(160,220,255,0.6), rgba(0,240,255,0.4), transparent);
 }
 
+/* glossy shine overlay */
+#topbar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+  pointer-events: none;
+}
 #logo {
   display: flex;
   align-items: baseline;
@@ -367,8 +381,8 @@ body::after {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr;
-  gap: 10px;
-  padding: 10px;
+  gap: 12px;
+  padding: 12px;
   flex: 1;
   overflow: hidden;
   min-height: 0;
@@ -379,24 +393,50 @@ body::after {
   background: var(--glass);
   backdrop-filter: var(--gloss-blur);
   -webkit-backdrop-filter: var(--gloss-blur);
-  border: 1px solid var(--border2);
+  border: 1px solid var(--border);
   border-radius: var(--r-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
   box-shadow:
-    0 8px 40px rgba(0,0,0,0.45),
-    0 2px 0 rgba(255,255,255,0.03) inset,
-    0 -1px 0 rgba(0,0,0,0.3) inset;
-  transition: box-shadow 0.3s;
+    0 8px 32px rgba(0,0,0,0.3),
+    0 0 1px rgba(255,255,255,0.1) inset,
+    0 -1px 0 rgba(0,0,0,0.2) inset;
+  transition: all 0.3s ease;
+}
+
+/* glossy shine overlay */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-lg);
+  background: var(--glass-shine);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* top highlight streak */
+.panel::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 40%;
+  border-radius: var(--r-lg) var(--r-lg) 100% 100% / 20% 20% 80% 80%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .panel:hover {
+  border-color: var(--border2);
   box-shadow:
-    0 12px 50px rgba(0,0,0,0.5),
-    0 2px 0 rgba(255,255,255,0.04) inset,
-    0 -1px 0 rgba(0,0,0,0.3) inset;
+    0 12px 40px rgba(0,0,0,0.35),
+    0 0 20px var(--cyan-glow),
+    0 0 1px rgba(255,255,255,0.15) inset;
 }
 
 /* top gloss streak */
@@ -405,14 +445,14 @@ body::after {
   top: 0; left: 12px; right: 12px;
   height: 1px;
   border-radius: 1px;
-  background: linear-gradient(90deg, transparent, rgba(160,220,255,0.5), transparent);
+  background: linear-gradient(90deg, transparent, rgba(160,220,255,0.6), transparent);
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
 }
 
 /* per-panel accent top lines */
-#panel-left .panel-glow-top  { background: linear-gradient(90deg, transparent, rgba(77,166,255,0.7), rgba(0,240,212,0.4), transparent); }
-#panel-right .panel-glow-top { background: linear-gradient(90deg, transparent, rgba(0,240,212,0.7), rgba(77,166,255,0.4), transparent); }
+#panel-left .panel-glow-top  { background: linear-gradient(90deg, transparent, rgba(77,166,255,0.8), rgba(0,240,255,0.5), transparent); }
+#panel-right .panel-glow-top { background: linear-gradient(90deg, transparent, rgba(0,240,255,0.8), rgba(77,166,255,0.5), transparent); }
 
 .panel-header {
   display: flex;
@@ -422,9 +462,11 @@ body::after {
   border-bottom: 1px solid var(--border);
   gap: 10px;
   flex-shrink: 0;
-  background: rgba(4, 8, 20, 0.3);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(4, 8, 20, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 4;
 }
 
 .panel-label {
@@ -726,26 +768,43 @@ body::after {
 
 /* answer cards */
 .answer-card {
-  border: 1px solid var(--border2);
+  border: 1px solid var(--border);
   border-radius: var(--r);
   overflow: hidden;
   animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
-  background: var(--glass);
-  backdrop-filter: var(--gloss-blur);
-  -webkit-backdrop-filter: var(--gloss-blur);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+  background: var(--glass2);
+  backdrop-filter: var(--gloss-blur-sm);
+  -webkit-backdrop-filter: var(--gloss-blur-sm);
+  box-shadow: 
+    0 4px 20px rgba(0,0,0,0.25),
+    0 0 1px rgba(255,255,255,0.08) inset;
   position: relative;
 }
 
-/* gloss streak on new answer card */
+/* glossy overlay */
 .answer-card::before {
   content: '';
   position: absolute;
-  top: 0; left: 10%; right: 10%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(0,240,212,0.4), transparent);
+  inset: 0;
+  border-radius: var(--r);
+  background: var(--glass-shine);
   pointer-events: none;
+  z-index: 1;
+}
+
+/* top highlight */
+.answer-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 40%;
+  border-radius: var(--r) var(--r) 100% 100% / 15% 15% 85% 85%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .ac-head {
@@ -753,9 +812,11 @@ body::after {
   align-items: center;
   padding: 8px 12px;
   gap: 8px;
-  background: rgba(4, 10, 24, 0.5);
+  background: rgba(4, 10, 24, 0.25);
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
+  position: relative;
+  z-index: 3;
 }
 
 .ac-num {
@@ -852,13 +913,22 @@ body::after {
   gap: 0;
   padding: 0 16px;
   height: 36px;
-  border-top: 1px solid var(--border2);
-  background: var(--glass-solid);
-  backdrop-filter: var(--gloss-blur);
-  -webkit-backdrop-filter: var(--gloss-blur);
+  border-top: 1px solid var(--border);
+  background: var(--glass);
+  backdrop-filter: var(--gloss-blur-sm);
+  -webkit-backdrop-filter: var(--gloss-blur-sm);
   flex-shrink: 0;
   overflow: hidden;
-  box-shadow: 0 -1px 0 rgba(160,220,255,0.08);
+  position: relative;
+}
+
+/* top highlight */
+#statusbar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(160,220,255,0.3), transparent);
 }
 
 .sb-seg {
@@ -901,9 +971,9 @@ body::after {
 #modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(2, 4, 12, 0.88);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  background: rgba(3, 6, 15, 0.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
   z-index: 200;
   display: flex;
   align-items: center;
@@ -912,28 +982,42 @@ body::after {
 
 #modal {
   width: 520px;
-  background: rgba(10, 16, 34, 0.72);
-  backdrop-filter: blur(32px) saturate(1.8);
-  -webkit-backdrop-filter: blur(32px) saturate(1.8);
-  border: 1px solid var(--border2);
-  border-radius: 18px;
+  background: var(--glass);
+  backdrop-filter: var(--gloss-blur);
+  -webkit-backdrop-filter: var(--gloss-blur);
+  border: 1px solid var(--border);
+  border-radius: 20px;
   overflow: hidden;
   box-shadow:
-    0 40px 100px rgba(0,0,0,0.7),
-    0 0 0 1px rgba(255,255,255,0.04) inset,
-    0 1px 0 rgba(160,220,255,0.15) inset;
+    0 30px 80px rgba(0,0,0,0.4),
+    0 0 1px rgba(255,255,255,0.1) inset;
   animation: modalIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
   position: relative;
 }
 
-/* modal gloss top edge */
+/* glossy overlay */
+#modal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: var(--glass-shine);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* modal top highlight */
 #modal::after {
   content: '';
   position: absolute;
-  top: 0; left: 15%; right: 15%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(140,220,255,0.6), rgba(0,240,212,0.4), transparent);
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 45%;
+  border-radius: 20px 20px 100% 100% / 25% 25% 75% 75%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%);
   pointer-events: none;
+  z-index: 2;
 }
 
 @keyframes modalIn {
@@ -942,17 +1026,19 @@ body::after {
 }
 
 .modal-stripe {
-  height: 2px;
+  height: 3px;
   background: linear-gradient(90deg, var(--blue), var(--cyan), var(--green), var(--cyan), var(--blue));
   background-size: 200% 100%;
   animation: shimmerStripe 3s linear infinite;
+  position: relative;
+  z-index: 3;
 }
 @keyframes shimmerStripe {
   0%   { background-position: 0% 0; }
   100% { background-position: 200% 0; }
 }
 
-.modal-body { padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 20px; }
+.modal-body { padding: 28px 28px 24px; display: flex; flex-direction: column; gap: 20px; position: relative; z-index: 3; }
 
 .modal-h {
   display: flex;
@@ -1072,20 +1158,45 @@ body::after {
   transition: all 0.25s;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 24px rgba(0,180,220,0.3), inset 0 1px 0 rgba(255,255,255,0.25);
+  box-shadow: 
+    0 4px 24px rgba(0,180,220,0.3), 
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
 }
+
+/* glossy shine */
 #btn-launch::before {
   content: '';
   position: absolute;
-  top: 0; left: -100%; width: 60%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  top: 0;
+  left: -100%; 
+  width: 60%; 
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
   transform: skewX(-20deg);
   transition: left 0.5s ease;
 }
+
+/* bottom reflection */
+#btn-launch::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 10%;
+  right: 10%;
+  height: 50%;
+  background: linear-gradient(0deg, rgba(255,255,255,0.15) 0%, transparent 100%);
+  border-radius: 0 0 6px 6px;
+  pointer-events: none;
+}
+
 #btn-launch:hover::before { left: 150%; }
 #btn-launch:hover {
-  box-shadow: 0 6px 32px rgba(0,200,230,0.4), inset 0 1px 0 rgba(255,255,255,0.3);
-  transform: translateY(-1px);
+  box-shadow: 
+    0 6px 32px rgba(0,200,230,0.5), 
+    inset 0 1px 0 rgba(255,255,255,0.35),
+    0 0 20px var(--cyan-glow);
+  transform: translateY(-2px);
 }
 
 /* ═══════════════ TOAST ═══════════════ */
@@ -1226,6 +1337,7 @@ body::after {
   </div>
 
   <div id="topbar-right">
+    <div class="status-chip" id="chip-backend"><div class="status-dot"></div>Backend</div>
     <div class="status-chip" id="chip-stt"><div class="status-dot"></div>STT</div>
     <div class="status-chip" id="chip-llm"><div class="status-dot"></div>LLM</div>
     <button id="btn-capture">
@@ -1338,13 +1450,19 @@ body::after {
 // ═══════════════════════════════════════════
 //  CONFIG & STATE
 // ═══════════════════════════════════════════
+const DEFAULT_HOST = location.hostname || '127.0.0.1';
+const DEFAULT_HTTP_BASE = `${location.protocol === 'https:' ? 'https' : 'http'}://${DEFAULT_HOST}`;
+const DEFAULT_WS_BASE = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${DEFAULT_HOST}`;
+
 const CFG = {
   llm: 'ollama',
-  ollamaUrl: 'http://localhost:11434',
+  ollamaUrl: `${DEFAULT_HTTP_BASE}:11434`,
   model: 'llama3.2',
   apiUrl: '',
   apiKey: '',
   role: '',
+  backendHttpUrl: `${DEFAULT_HTTP_BASE}:8001`,
+  backendWsUrl: `${DEFAULT_WS_BASE}:8001`,
   sourceMode: 'tab',       // tab | mic | both
   platform: 'teams'
 };
@@ -1357,6 +1475,7 @@ const ST = {
   ansCount: 0,
   history: [],             // {role, text, ts}
   pendingQuestion: '',
+  ansCard: null,
   abortCtrl: null,
   liveEl: null,            // current interim DOM element
   accumulated: '',         // buffered final text
@@ -1366,9 +1485,17 @@ const ST = {
   analyser: null,
   tabStream: null,
   micStream: null,
+  captureStream: null,
   recognition: null,
   rafId: null,
   waveHistory: new Array(80).fill(0),
+  mixDestination: null,
+  mixSources: [],
+  audioProcessor: null,
+  silentGain: null,
+  // WebSocket connections
+  wsAudio: null,
+  wsUi: null,
 };
 
 // ═══════════════════════════════════════════
@@ -1398,7 +1525,24 @@ function onLaunched() {
   initVisualizer();
   document.getElementById('sb-context-input').value = CFG.role;
   document.getElementById('sb-src').textContent = CFG.sourceMode.toUpperCase();
+  checkBackendHealth().catch(() => {});
   toast('Copilot ready — click Start Capture', 'info');
+}
+
+async function checkBackendHealth() {
+  try {
+    const resp = await fetch(`${CFG.backendHttpUrl}/health`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    console.log('[HEALTH]', data);
+    setChip('backend', 'live');
+    return data;
+  } catch (e) {
+    console.error('[HEALTH] Backend unavailable:', e);
+    setChip('backend', 'err');
+    showAlert(`Backend unavailable at ${CFG.backendHttpUrl}`);
+    throw e;
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1544,7 +1688,20 @@ function setBtnCapture(capturing) {
 async function startCapture() {
   setBtnCapture(true);
   ST.capturing = true;
+  ST.ansCard = null;
   removeEmpty('tx');
+  document.getElementById('alert-banner').classList.remove('show');
+
+  try {
+    await checkBackendHealth();
+    await connectBackendWS();
+  } catch (e) {
+    showAlert('Cannot connect to backend. Is it running on port 8001?');
+    setChip('stt', 'idle');
+    setBtnCapture(false);
+    ST.capturing = false;
+    return;
+  }
 
   const mode = CFG.sourceMode;
 
@@ -1557,24 +1714,48 @@ async function startCapture() {
     }
   } catch (e) {
     console.error('Capture error:', e);
-    toast('Capture failed: ' + e.message, 'err');
-    if (mode === 'tab') {
-      showAlert('Tab audio capture failed. Switching to Microphone mode. Make sure to select a tab and enable "Share tab audio".');
-      CFG.sourceMode = 'mic';
-      try { await startMicCapture(); } catch(e2) {
-        toast('Mic capture also failed: ' + e2.message, 'err');
-        stopCapture(); return;
-      }
+    
+    // Hardened error handling
+    if (e.name === 'NotAllowedError') {
+      toast('Permission Denied: You MUST tick "Share Tab Audio"', 'err');
     } else {
-      stopCapture(); return;
+      toast('Capture failed: ' + e.message, 'err');
+    }
+    
+    // Fallback: try microphone only
+    CFG.sourceMode = 'mic';
+    ST.tabStream = null;
+    try { 
+      await startMicCapture(); 
+      toast('Switched to Microphone mode', 'ok');
+    } catch(e2) {
+      toast('Mic capture also failed: ' + e2.message, 'err');
+      disconnectBackendWS();
+      setChip('stt', 'idle');
+      setBtnCapture(false);
+      ST.capturing = false;
+      return;
     }
   }
 
-  document.getElementById('vis-source-label').textContent =
-    mode === 'tab' ? '📺 Tab Audio' : mode === 'mic' ? '🎙 Microphone' : '🔀 Tab + Mic';
+  // Verify we have at least one stream
+  const stream = ST.tabStream || ST.micStream;
+  if (!stream) {
+    showAlert('No audio source available');
+    disconnectBackendWS();
+    setChip('stt', 'idle');
+    setBtnCapture(false);
+    ST.capturing = false;
+    return;
+  }
 
+  document.getElementById('vis-source-label').textContent =
+    ST.tabStream && ST.micStream ? '🔀 Tab + Mic' : 
+    ST.tabStream ? '📺 Tab Audio' : '🎙 Microphone';
+
+  prepareCaptureStream();
   setChip('stt', 'live');
-  startSpeechRecognition();
+  startAudioStream();
   toast('Capture started', 'ok');
 }
 
@@ -1582,26 +1763,21 @@ async function startCapture() {
 //  TAB AUDIO CAPTURE via getDisplayMedia
 // ═══════════════════════════════════════════
 async function startTabCapture() {
-  // getDisplayMedia with audio — user selects a tab and ticks "Share tab audio"
+  // Hardened capture: ensure audio sharing
   const stream = await navigator.mediaDevices.getDisplayMedia({
-    video: { width: 1, height: 1, frameRate: 1 }, // minimal video required by browser
-    audio: {
-      echoCancellation: false,
-      noiseSuppression: false,
-      autoGainControl: false,
-      sampleRate: 16000
-    }
+    video: true,
+    audio: true // CRITICAL: Ensure 'Share Tab Audio' is ticked in the popup
   });
-
+  
   ST.tabStream = stream;
 
   // Stop video track immediately — we only want audio
   stream.getVideoTracks().forEach(t => t.stop());
 
   const audioTracks = stream.getAudioTracks();
-  if (!audioTracks.length) throw new Error('No audio track in tab stream. Did you tick "Share tab audio"?');
-
-  setupAudioAnalyser(stream);
+  if (!audioTracks.length) {
+    throw new Error('No audio track. You MUST tick "Share Tab Audio" in the browser popup!');
+  }
 
   // Monitor for stream end (user clicks "Stop sharing")
   audioTracks[0].addEventListener('ended', () => {
@@ -1625,21 +1801,55 @@ async function startMicCapture() {
     }
   });
   ST.micStream = stream;
-
-  // If tab already set up analyser, don't override
-  if (!ST.audioCtx) setupAudioAnalyser(stream);
 }
 
 // ═══════════════════════════════════════════
 //  AUDIO ANALYSER (shared)
 // ═══════════════════════════════════════════
 function setupAudioAnalyser(stream) {
-  ST.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  if (!ST.audioCtx || ST.audioCtx.state === 'closed') {
+    ST.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  }
   const source = ST.audioCtx.createMediaStreamSource(stream);
   ST.analyser = ST.audioCtx.createAnalyser();
   ST.analyser.fftSize = 512;
   source.connect(ST.analyser);
   drawLiveWave(ST.analyser);
+}
+
+function prepareCaptureStream() {
+  ST.mixSources.forEach(source => source.disconnect());
+  ST.mixSources = [];
+  ST.mixDestination = null;
+  ST.captureStream = null;
+
+  const activeStreams = [ST.tabStream, ST.micStream].filter(Boolean);
+  if (!activeStreams.length) return null;
+
+  if (activeStreams.length === 1) {
+    ST.captureStream = activeStreams[0];
+    setupAudioAnalyser(ST.captureStream);
+    return ST.captureStream;
+  }
+
+  if (!ST.audioCtx || ST.audioCtx.state === 'closed') {
+    ST.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  }
+
+  ST.mixDestination = ST.audioCtx.createMediaStreamDestination();
+  ST.analyser = ST.audioCtx.createAnalyser();
+  ST.analyser.fftSize = 512;
+
+  activeStreams.forEach(stream => {
+    const source = ST.audioCtx.createMediaStreamSource(stream);
+    source.connect(ST.mixDestination);
+    source.connect(ST.analyser);
+    ST.mixSources.push(source);
+  });
+
+  ST.captureStream = ST.mixDestination.stream;
+  drawLiveWave(ST.analyser);
+  return ST.captureStream;
 }
 
 // ═══════════════════════════════════════════
@@ -1650,7 +1860,12 @@ function stopCapture() {
   setBtnCapture(false);
   setChip('stt', 'idle');
 
-  if (ST.recognition) { try { ST.recognition.stop(); } catch(e){} ST.recognition = null; }
+  stopAudioStream();
+  disconnectBackendWS();
+  ST.mixSources.forEach(source => source.disconnect());
+  ST.mixSources = [];
+  ST.mixDestination = null;
+  ST.captureStream = null;
   if (ST.tabStream) { ST.tabStream.getTracks().forEach(t=>t.stop()); ST.tabStream = null; }
   if (ST.micStream) { ST.micStream.getTracks().forEach(t=>t.stop()); ST.micStream = null; }
   if (ST.audioCtx)  { ST.audioCtx.close(); ST.audioCtx = null; ST.analyser = null; }
@@ -1668,80 +1883,235 @@ function stopCapture() {
 }
 
 // ═══════════════════════════════════════════
-//  WEB SPEECH API — core STT engine
+//  WEBSOCKET CONNECTIONS TO BACKEND
 // ═══════════════════════════════════════════
-function startSpeechRecognition() {
-  const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SRClass) {
-    showAlert('Web Speech API not available. Use Chrome or Edge for full functionality.');
+function connectBackendWS() {
+  return new Promise((resolve, reject) => {
+    let audioReady = false;
+    let uiReady = false;
+    let settled = false;
+    let timeoutId = null;
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    };
+
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      disconnectBackendWS();
+      reject(error);
+    };
+
+    const maybeResolve = () => {
+      if (settled || !audioReady || !uiReady) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+
+    ST.wsAudio = new WebSocket(`${CFG.backendWsUrl}/ws/audio`);
+    ST.wsUi = new WebSocket(`${CFG.backendWsUrl}/ws/ui`);
+
+    ST.wsAudio.onopen = () => {
+      console.log('[WS] Audio connected');
+      audioReady = true;
+      maybeResolve();
+    };
+    ST.wsAudio.onerror = (e) => {
+      console.error('[WS] Audio error:', e);
+      fail(new Error('Audio WebSocket connection failed'));
+    };
+
+    ST.wsUi.onopen = () => {
+      console.log('[WS] UI connected');
+      uiReady = true;
+      maybeResolve();
+    };
+    ST.wsUi.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        console.log('[WS-UI] Received:', msg);
+
+        if (msg.type === 'transcript') {
+          // UI Filtering: handle interim vs final
+          if (msg.is_final === false) {
+            // Update live transcript - find and update the last 'live' bubble
+            const bubbles = document.querySelectorAll('.tx-bubble.live');
+            if (bubbles.length > 0) {
+              bubbles[bubbles.length - 1].innerHTML = `${esc(msg.text)}<span class="blink-cursor"></span>`;
+            } else {
+              addTxEntry(msg.text, 'live', msg.who);
+            }
+          } else {
+            // Final: finalize and clear liveEl
+            addTxEntry(msg.text, 'final', msg.who);
+            // Remove any pending live bubbles
+            document.querySelectorAll('.tx-bubble.live').forEach(el => el.remove());
+          }
+          ST.accumulated += `${msg.text || ''} `;
+          detectQuestion(ST.accumulated);
+          if (ST.accumulated.trim().length > 12) {
+            clearTimeout(ST.silenceTimer);
+            ST.silenceTimer = setTimeout(() => {
+              flushToLLM(ST.accumulated.trim());
+              ST.accumulated = '';
+            }, 2500);
+          }
+          return;
+        }
+
+        handleBackendMessage(msg);
+      } catch (err) { console.error('[WS] Parse error:', err); }
+    };
+    ST.wsUi.onerror = (e) => {
+      console.error('[WS] UI error:', e);
+      fail(new Error('UI WebSocket connection failed'));
+    };
+
+    timeoutId = setTimeout(() => {
+      fail(new Error('WS connection timeout'));
+    }, 5000);
+  });
+}
+
+function disconnectBackendWS() {
+  if (ST.wsAudio) { ST.wsAudio.close(); ST.wsAudio = null; }
+  if (ST.wsUi) { ST.wsUi.close(); ST.wsUi = null; }
+}
+
+function handleBackendMessage(msg) {
+  if (msg.type === 'transcript') {
+    const text = msg.text || '';
+    const who = msg.who || detectSpeaker(text);
+    const entryType = msg.is_final === false ? 'live' : 'final';
+    addTxEntry(text, entryType, who);
+    ST.accumulated += text + ' ';
+    detectQuestion(ST.accumulated);
+    if (ST.accumulated.trim().length > 12) {
+      clearTimeout(ST.silenceTimer);
+      ST.silenceTimer = setTimeout(() => {
+        flushToLLM(ST.accumulated.trim());
+        ST.accumulated = '';
+      }, 2500);
+    }
+  } else if (msg.type === 'copilot_partial') {
+    if (!ST.ansCard) {
+      ST.ansCard = createAnswerCard(ST.pendingQuestion || 'AI Suggestion');
+    }
+    streamCard(ST.ansCard, msg.text || '');
+    ST.ansCard._fullText = msg.text || '';
+  } else if (msg.type === 'copilot_final') {
+    if (ST.ansCard) {
+      finalizeCard(ST.ansCard, msg.text || '', 0, 'done');
+      ST.ansCard = null;
+      ST.history.push({ role: 'assistant', text: msg.text || '', ts: Date.now() });
+      ST.ansCount++;
+      document.getElementById('sb-ans').textContent = ST.ansCount;
+      document.getElementById('ans-count').textContent = `${ST.ansCount} answers`;
+      setChip('llm', 'idle');
+    }
+  } else if (msg.type === 'heartbeat') {
+    // Keep alive
+  } else if (msg.type === 'status') {
+    console.log('[WS] Backend:', msg.text);
+  } else if (msg.type === 'reconnect_needed') {
+    showAlert(msg.text);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  AUDIO STREAM TO WEBSOCKET (using AudioWorklet)
+// ═══════════════════════════════════════════
+const audioWorkletCode = `
+class AudioToWsProcessor extends AudioWorkletProcessor {
+  process(inputs, outputs, parameters) {
+    const input = inputs[0];
+    if (input && input.length > 0) {
+      const channelData = input[0];
+      const pcm16 = new Int16Array(channelData.length);
+      for (let i = 0; i < channelData.length; i++) {
+        pcm16[i] = Math.max(-1, Math.min(1, channelData[i])) * 0x7FFF;
+      }
+      this.port.postMessage(pcm16.buffer, [pcm16.buffer]);
+    }
+    return true;
+  }
+}
+registerProcessor('audio-to-ws', AudioToWsProcessor);
+`;
+
+async function startAudioStream() {
+  const stream = ST.captureStream || ST.tabStream || ST.micStream;
+  if (!stream) {
+    showAlert('No audio stream available.');
     return;
   }
 
-  const rec = new SRClass();
-  rec.continuous     = true;
-  rec.interimResults = true;
-  rec.lang           = 'en-US';
-  rec.maxAlternatives = 1;
-  ST.recognition = rec;
-  ST.accumulated = '';
-  ST.liveEl = null;
+  // Create audio context and analyser if not exists
+  if (!ST.audioCtx) {
+    ST.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  }
+  
+  if (!ST.analyser) {
+    ST.analyser = ST.audioCtx.createAnalyser();
+    ST.analyser.fftSize = 512;
+    const source = ST.audioCtx.createMediaStreamSource(stream);
+    source.connect(ST.analyser);
+    drawLiveWave(ST.analyser);
+  }
 
-  rec.onresult = (evt) => {
-    let interim = '';
-    let finalChunk = '';
+  const blob = new Blob([audioWorkletCode], { type: 'application/javascript' });
+  const workletUrl = URL.createObjectURL(blob);
+  
+  try {
+    await ST.audioCtx.audioWorklet.addModule(workletUrl);
+    URL.revokeObjectURL(workletUrl);
+  } catch (e) {
+    URL.revokeObjectURL(workletUrl);
+    console.error('Worklet error:', e);
+    showAlert('Audio worklet failed: ' + e.message);
+    return;
+  }
 
-    for (let i = evt.resultIndex; i < evt.results.length; i++) {
-      const t = evt.results[i][0].transcript;
-      if (evt.results[i].isFinal) { finalChunk += t + ' '; }
-      else { interim += t; }
-    }
-
-    if (finalChunk.trim()) {
-      // Remove live element
-      if (ST.liveEl) { ST.liveEl.remove(); ST.liveEl = null; }
-
-      ST.accumulated += finalChunk;
-      addTxEntry(finalChunk.trim(), 'final', detectSpeaker(finalChunk));
-
-      // Question detection
-      detectQuestion(ST.accumulated);
-
-      // Silence-gap flush: 2.5s of no new final speech → send to LLM
-      clearTimeout(ST.silenceTimer);
-      if (ST.accumulated.trim().length > 12) {
-        ST.silenceTimer = setTimeout(() => {
-          flushToLLM(ST.accumulated.trim());
-          ST.accumulated = '';
-        }, 2500);
-      }
-    }
-
-    if (interim) {
-      if (!ST.liveEl) {
-        ST.liveEl = addTxEntry(interim, 'live', 'YOU');
-      } else {
-        const b = ST.liveEl.querySelector('.tx-bubble');
-        if (b) b.innerHTML = esc(interim) + '<span class="blink-cursor"></span>';
-      }
-      detectQuestion(interim);
+  const source = ST.audioCtx.createMediaStreamSource(stream);
+  
+  const workletNode = new AudioWorkletNode(ST.audioCtx, 'audio-to-ws');
+  
+  // Receive PCM data from worklet and send to WebSocket
+  workletNode.port.onmessage = (e) => {
+    if (ST.wsAudio && ST.wsAudio.readyState === WebSocket.OPEN) {
+      ST.wsAudio.send(e.data);
     }
   };
+  
+  source.connect(workletNode);
 
-  rec.onerror = (e) => {
-    if (e.error === 'no-speech' || e.error === 'aborted') return;
-    console.error('STT error', e.error);
-    setChip('stt', 'warn');
-    toast('STT: ' + e.error, 'err');
-  };
+  ST.silentGain = ST.audioCtx.createGain();
+  ST.silentGain.gain.value = 0;
+  workletNode.connect(ST.silentGain);
+  ST.silentGain.connect(ST.audioCtx.destination);
 
-  rec.onend = () => {
-    // Auto-restart — handles Chrome's 60s recognition limit
-    if (ST.capturing) {
-      setTimeout(() => { try { rec.start(); } catch(e){} }, 150);
-    }
-  };
+  ST.audioProcessor = workletNode;
+  console.log('[AUDIO] Streaming to backend via AudioWorklet...');
+}
 
-  try { rec.start(); } catch(e) { toast('Speech recognition failed: ' + e.message, 'err'); }
+// ═══════════════════════════════════════════
+//  STOP AUDIO STREAM
+// ═══════════════════════════════════════════
+function stopAudioStream() {
+  if (ST.audioProcessor) {
+    ST.audioProcessor.disconnect();
+    ST.audioProcessor = null;
+  }
+  if (ST.silentGain) {
+    ST.silentGain.disconnect();
+    ST.silentGain = null;
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1835,7 +2205,17 @@ function addTxEntry(text, type, who) {
 function flushToLLM(text) {
   if (!text || text.length < 6) return;
   ST.history.push({ role: 'user', text, ts: Date.now() });
-  generateAnswer(text);
+  
+  // Option A: Send to backend via WebSocket, let backend handle LLM
+  if (ST.wsUi && ST.wsUi.readyState === WebSocket.OPEN) {
+    ST.pendingQuestion = text;
+    ST.ansCard = createAnswerCard(text);
+    setChip('llm', 'proc');
+    ST.wsUi.send(JSON.stringify({ type: 'question', content: text }));
+  } else {
+    // Fallback: use local Ollama
+    generateAnswer(text);
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1946,7 +2326,7 @@ async function streamOllama(messages, card) {
 //  OPENAI-COMPATIBLE STREAMING
 // ═══════════════════════════════════════════
 async function streamOpenAICompat(messages, card) {
-  const base = CFG.apiUrl || 'http://localhost:11434/v1';
+  const base = CFG.apiUrl || `${CFG.ollamaUrl}/v1`;
   const headers = { 'Content-Type': 'application/json' };
   if (CFG.apiKey) headers['Authorization'] = `Bearer ${CFG.apiKey}`;
 
@@ -2039,6 +2419,7 @@ function copyCard(btn) {
 // ═══════════════════════════════════════════
 function setChip(which, state) {
   const el = document.getElementById(`chip-${which}`);
+  if (!el) return;
   el.className = 'status-chip';
   if (state === 'live')  el.classList.add('live');
   if (state === 'proc')  el.classList.add('proc');
