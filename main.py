@@ -39,13 +39,16 @@ logger = logging.getLogger("corebrum")
 
 
 class Settings(pydantic_settings.BaseSettings):
-    groq_api_key: str = ""
-    gemini_api_key: str = ""
+    groq_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
     port: int = 8001
     cors_origins: list[str] = ["*"]
     audio_sample_rate: int = 16000
     silence_threshold: float = 0.25
     heartbeat_interval: int = 5
+    ollama_model: str = "llama3.2:3b"
+    rate_limit_requests: int = 30
+    rate_limit_window: int = 60
 
     class Config:
         extra = "ignore"
@@ -55,14 +58,53 @@ settings = Settings()
 GROQ_API_KEY = settings.groq_api_key or os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = settings.gemini_api_key or os.getenv("GEMINI_API_KEY", "")
 
-if GROQ_API_KEY:
-    logger.info("[INFO] API Keys loaded successfully")
-else:
+if not GROQ_API_KEY:
     logger.warning("[WARN] No GROQ_API_KEY found in environment")
+else:
+    logger.info("[INFO] API Keys loaded successfully")
 
 HALLUCINATION_FILTER = frozenset(
     {"thank you", "thanks for watching", "subscribe", "watching", "amara.org", "bye"}
 )
+
+FILLER_WORDS = frozenset(
+    {
+        "um",
+        "uh",
+        "mm",
+        "hm",
+        "hmm",
+        "er",
+        "ah",
+        "like",
+        "you know",
+        "basically",
+        "actually",
+        "literally",
+        "so yeah",
+        "i mean",
+    }
+)
+
+
+def sanitize_error_message(error: Exception) -> str:
+    """Sanitize error messages to prevent internal details leaking to clients."""
+    error_str = str(error)
+    sensitive_patterns = [
+        "api_key",
+        "password",
+        "token",
+        "secret",
+        "credential",
+        "path",
+        "file",
+        "localhost",
+        "127.0.0.1",
+    ]
+    for pattern in sensitive_patterns:
+        if pattern.lower() in error_str.lower():
+            return "An internal error occurred. Please check server logs."
+    return "An error occurred. Please try again."
 
 
 def clean_transcript(text: str) -> str:
@@ -148,25 +190,6 @@ HALLUCINATION_EXTENDED = frozenset(
         "bye.",
         "please like",
         "like and subscribe",
-    }
-)
-
-FILLER_WORDS = frozenset(
-    {
-        "um",
-        "uh",
-        "mm",
-        "hm",
-        "hmm",
-        "er",
-        "ah",
-        "like",
-        "you know",
-        "basically",
-        "actually",
-        "literally",
-        "so yeah",
-        "i mean",
     }
 )
 
@@ -821,7 +844,7 @@ Provide 2-3 concise bullet points starting with action verbs."""
     except Exception as e:
         logger.error(f"[OLLAMA] Error: {e}")
         await connection_manager.broadcast(
-            "ui", {"type": "copilot_final", "text": f"Ollama error: {str(e)}"}
+            "ui", {"type": "copilot_final", "text": sanitize_error_message(e)}
         )
 
 
@@ -900,6 +923,36 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+
+class RateLimiter:
+    def __init__(self, max_requests: int = 30, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self.requests: dict[str, list[float]] = {}
+
+    def is_allowed(self, client_id: str) -> bool:
+        import time
+
+        now = time.time()
+        if client_id not in self.requests:
+            self.requests[client_id] = []
+
+        self.requests[client_id] = [
+            ts for ts in self.requests[client_id] if now - ts < self.window_seconds
+        ]
+
+        if len(self.requests[client_id]) >= self.max_requests:
+            return False
+
+        self.requests[client_id].append(now)
+        return True
+
+
+rate_limiter = RateLimiter(
+    max_requests=settings.rate_limit_requests,
+    window_seconds=settings.rate_limit_window,
 )
 
 
