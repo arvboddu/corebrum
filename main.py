@@ -650,29 +650,37 @@ async def groq_transcription_worker():
                     if len(transcript_history) > MAX_HISTORY:
                         transcript_history.pop(0)
 
-                    # 5. Buffer Reset: clear after final
+                    # 5. Buffer Reset: clear after final (hard reset)
                     current_transcript_buffer = ""
                     last_sent_text = text
+                    current_utterance_id = ""  # Clear ID to force fresh uuid4()
 
                     connection_manager.broadcast_task("ui", transcript_payload)
                     await connection_manager.broadcast_to_ui(transcript_payload)
                     logger.info(f"[HUD_RELAY] Transcript broadcast complete")
 
-                    # Generate new utterance_id for next speech
-                    current_utterance_id = str(uuid.uuid4())
-
-                # 6. Non-Blocking LLM Call with try/except
+                # 6. Async Shield: Non-blocking LLM call
                 words = text.split()
                 conversation_history.append(text)
 
-                logger.info(f"[GROQ_WORKER] Words: {len(words)}, calling Ollama...")
-                try:
-                    await process_brain_ollama(text)
-                except Exception as e:
-                    logger.error(f"[GROQ_WORKER] Ollama failed: {e}")
-                    await connection_manager.broadcast(
-                        "ui", {"type": "copilot_final", "text": "LLM Busy..."}
-                    )
+                logger.info(
+                    f"[GROQ_WORKER] Words: {len(words)}, firing Ollama async..."
+                )
+
+                # Generate fresh utterance_id for next speech BEFORE async task
+                current_utterance_id = str(uuid.uuid4())
+
+                # Fire and forget - don't await, use create_task
+                async def safe_ollama_call():
+                    try:
+                        await process_brain_ollama(text)
+                    except Exception as e:
+                        logger.error(f"[GROQ_WORKER] Ollama failed: {e}")
+                        await connection_manager.broadcast(
+                            "ui", {"type": "copilot_final", "text": "LLM Busy..."}
+                        )
+
+                asyncio.create_task(safe_ollama_call())
 
         except Exception as e:
             logger.error(f"[GROQ_WORKER] Error: {e}")
