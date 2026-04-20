@@ -470,6 +470,7 @@
   #toast.ok { color: var(--teal-text); border-color: var(--teal); }
   #toast.err { color: var(--red-text); border-color: var(--red); }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -1339,6 +1340,94 @@ function toast(msg, type='') {
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// PDF text extraction
+async function readFileAsText(file) {
+  if (file.name.toLowerCase().endsWith('.pdf')) {
+    return await extractPdfText(file);
+  }
+  return new Promise(res => {
+    const reader = new FileReader();
+    reader.onload = e => res(e.target.result.slice(0, 4000));
+    reader.readAsText(file);
+  });
+}
+
+async function extractPdfText(file) {
+  try {
+    if (typeof pdfjsLib === 'undefined') {
+      return `[Resume: ${file.name}]`;
+    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const ab = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+    let text = '';
+    for (let i = 1; i <= Math.min(pdf.numPages, 4); i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(s => s.str).join(' ') + '\n';
+    }
+    return text.slice(0, 4000);
+  } catch (e) {
+    return `[Resume: ${file.name} — extraction failed]`;
+  }
+}
+
+function flushToLLM(text) {
+  detectQuestion(text);
+}
+
+function detectSpeaker(text) {
+  const youWords = ['i ', 'my ', 'me ', 'am ', 'was ', 'were ', 'have ', 'had ', 'do ', 'did ', 'will ', 'would ', 'can ', 'could '];
+  const isYou = youWords.some(w => text.toLowerCase().startsWith(w));
+  return isYou ? 'YOU' : 'INTERVIEWER';
+}
+
+function activateSpeaker(who) {
+  document.querySelectorAll('.speaker-chip').forEach(c => c.classList.remove('speaking'));
+  const chip = document.getElementById(who === 'YOU' ? 'sp-you' : 'sp-interviewer');
+  if (chip) chip.classList.add('speaking');
+}
+
+async function streamOpenAICompat(messages, card) {
+  const base = CFG.apiUrl || 'http://localhost:11434/v1';
+  const headers = { 'Content-Type': 'application/json' };
+  if (CFG.apiKey) headers['Authorization'] = `Bearer ${CFG.apiKey}`;
+  const resp = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ model: CFG.model, messages, stream: true, max_tokens: 600, temperature: 0.7 }),
+    signal: ST.abortCtrl?.signal
+  });
+  if (!resp.ok) throw new Error(`API ${resp.status}`);
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let full = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    for (const line of dec.decode(value, { stream: true }).split('\n').filter(Boolean)) {
+      try {
+        const j = JSON.parse(line);
+        if (j.choices?.[0]?.delta?.content) {
+          full += j.choices[0].delta.content;
+          streamCard(card, full);
+        }
+        if (j.choices?.[0]?.finish_reason) return full;
+      } catch(e) {}
+    }
+  }
+  return full;
+}
+
+function copyCard(btn) {
+  const card = btn.closest('.answer-card');
+  if (card) navigator.clipboard.writeText(card.querySelector('.ac-body').textContent);
+}
+
+function showAlert(msg) {
+  toast(msg, 'err');
 }
 
 document.addEventListener('keydown', e => {
