@@ -4,6 +4,26 @@
 > **Total issues found:** 10
 > **Estimated fix time:** ~2 hours total
 > **Fix before first live session:** Issues 1, 2, 3 (Critical)
+> **Status:** All 10 issues FIXED and committed in `72b14ec` and `437f3a6`
+
+---
+
+## ✅ Fix Status (All Applied)
+
+| Issue | Status | Commit |
+|-------|--------|--------|
+| 1 Dual STT guard | ✅ FIXED | `72b14ec` |
+| 2 PDF extraction | ✅ FIXED | `72b14ec` |
+| 3 Hidden inputs | ✅ FIXED | `72b14ec` |
+| 4 useBackend guard | ✅ FIXED | `72b14ec` |
+| 5 Resume URL timing | ✅ FIXED | `72b14ec` |
+| 6 Modal scroll CSS | ✅ FIXED | `72b14ec` |
+| 7 Silence flush | ✅ FIXED | `72b14ec` |
+| 8 Backend URL input | ✅ FIXED | `72b14ec` |
+| 9 Ollama timeout | ✅ FIXED | `72b14ec` |
+| 10 WS retry cap | ✅ FIXED | `72b14ec` |
+| + AudioWorklet | ✅ FIXED | `437f3a6` |
+| + Inline favicon | ✅ FIXED | `437f3a6` |
 
 ---
 
@@ -561,8 +581,24 @@ ws.onopen = () => {
 ## Quick Pre-Launch Checklist
 
 Before running `corebrum-hud-merged.html` in a live interview, verify:
-
 ```
+[✅] Issue 3 fixed — hidden inputs removed, CFG.llm/model set directly
+[✅] Issue 1 fixed — dual STT guard added to startCapture()
+[✅] Issue 2 fixed — PDF.js added or Option A fallback in readFileAsText()
+[✅] Issue 6 fixed — modal-body has max-height + overflow-y:auto
+[ ] Ollama running: OLLAMA_ORIGINS=* ollama serve
+[ ] Model pulled: ollama pull llama3.2
+[ ] Corebrum backend running (optional): python main.py
+[ ] Browser: Chrome or Edge (Web Speech API required)
+[ ] Tab audio: meeting open in separate tab, "Share tab audio" ticked
+```
+
+---
+
+## Commits
+
+- `72b14ec` - Fix 10 HUD integration issues: dual STT, PDF extraction, WS retry cap, Ollama timeout
+- `437f3a6` - Fix AudioWorklet deprecation, add inline favicon, handle cleanup properly
 [ ] Issue 3 fixed — hidden inputs removed, CFG.llm/model set directly
 [ ] Issue 1 fixed — dual STT guard added to startCapture()
 [ ] Issue 2 fixed — PDF.js added or Option A fallback in readFileAsText()
