@@ -1967,6 +1967,12 @@ function setBtnCapture(capturing) {
 //  START CAPTURE
 // ===
 async function startCapture() {
+  // Context Resume: Ensure audio context is not suspended
+  if (ST.audioCtx && ST.audioCtx.state === 'suspended') {
+    await ST.audioCtx.resume();
+    console.log('[CAPTURE] Resumed audio context');
+  }
+  
   setBtnCapture(true);
   ST.capturing = true;
   removeEmpty('tx');
@@ -2089,6 +2095,14 @@ async function setupAudioWorklet(stream) {
           const input = inputs[0];
           if (input && input.length > 0) {
             const channelData = input[0];
+            // Threshold Check: Calculate RMS, skip if below 0.01
+            let sum = 0;
+            for (let i = 0; i < channelData.length; i++) {
+              sum += channelData[i] * channelData[i];
+            }
+            const rms = Math.sqrt(sum / channelData.length);
+            if (rms < 0.01) return true;  // Skip quiet audio
+            
             const pcmData = new Int16Array(channelData.length);
             for (let i = 0; i < channelData.length; i++) {
               pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(channelData[i] * 32768)));
