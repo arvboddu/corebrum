@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interview Copilot</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙</text></svg>">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f3;
+    --bg3: #eeede9;
+    --text: #1a1a18;
+    --text2: #6b6b66;
+    --text3: #a8a8a2;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --teal: #1D9E75;
+    --teal-bg: #e1f5ee;
+    --teal-text: #0f6e56;
+    --blue: #378ADD;
+    --blue-bg: #e6f1fb;
+    --blue-text: #185fa5;
+    --red-bg: #fcebeb;
+    --red-text: #a32d2d;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --mono: 'SF Mono', Monaco, 'Courier New', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg2: #242422;
+      --bg3: #2c2c2a;
+      --text: #e8e8e2;
+      --text2: #9a9a94;
+      --text3: #5a5a55;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.15);
+      --teal-bg: #04342c;
+      --teal-text: #9fe1cb;
+      --blue-bg: #042c53;
+      --blue-text: #85b7eb;
+      --red-bg: #501313;
+      --red-text: #f09595;
+    }
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+  .header-left h1 {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .header-left p {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+  .badge-stealth {
+    background: var(--red-bg);
+    color: var(--red-text);
+  }
+  .badge-live {
+    background: var(--teal-bg);
+    color: var(--teal-text);
+    display: none;
+    align-items: center;
+    gap: 5px;
+  }
+  .badge-live.show { display: flex; }
+  .live-dot {
+    width: 6px; height: 6px;
+    background: var(--teal);
+    border-radius: 50%;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Platform selector */
+  .platform-row {
+    display: flex;
+    gap: 6px;
+    padding: 0 1.25rem 1rem;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg2);
+  }
+  .platform-btn {
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--bg);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .platform-btn:hover { background: var(--bg3); }
+  .platform-btn.active {
+    background: var(--blue-bg);
+    color: var(--blue-text);
+    border-color: transparent;
+  }
+
+  /* Main layout */
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    flex: 1;
+    background: var(--border);
+    min-height: 0;
+    overflow: hidden;
+  }
+  .panel {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  /* Panel header */
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--border);
+    flex-shrink: 0;
+  }
+  .panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .panel-meta {
+    display: flex;
+    gap: 6px;
+  }
+  .btn-icon {
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 0.5px solid var(--border);
+    background: var(--bg2);
+    color: var(--text2);
+    cursor: pointer;
+  }
+  .btn-icon:hover { background: var(--bg3); }
+
+  /* Audio visualizer */
+  .visualizer {
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+  }
+  .vis-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .vis-label { font-size: 10px; color: var(--text3); }
+  .vis-level { font-size: 10px; color: var(--text2); font-family: var(--mono); }
+  .vis-canvas {
+    width: 100%;
+    height: 36px;
+    border-radius: 6px;
+    background: var(--bg);
+  }
+
+  /* Speaker track */
+  .speaker-track {
+    display: flex;
+    gap: 6px;
+    padding: 8px 14px;
+    border-bottom: 0.5px solid var(--border);
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+  .speaker-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--bg2);
+    font-size: 10px;
+    color: var(--text2);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .speaker-chip.speaking {
+    background: var(--teal-bg);
+    color: var(--teal-text);
+    border-color: transparent;
+  }
+  .sp-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--text3);
+  }
+  .speaker-chip.speaking .sp-dot {
+    background: var(--teal);
+    animation: pulse 1s infinite;
+  }
+
+  /* Panel body */
+  .panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Transcript entry */
+  .tx-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .tx-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tx-who {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--blue-text);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .tx-who.them { color: var(--text3); }
+  .tx-ts {
+    font-size: 8px;
+    color: var(--text3);
+    font-style: italic;
+  }
+  .tx-type {
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+  .tx-type.live { background: var(--teal-bg); color: var(--teal-text); }
+  .tx-type.final { background: var(--blue-bg); color: var(--blue-text); }
+  .tx-bubble {
+    padding: 8px 11px;
+    border-radius: var(--radius);
+    font-size: 12px;
+    line-height: 1.5;
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+  }
+  .tx-bubble.live {
+    font-style: italic;
+    color: var(--text2);
+    border-left: 2px solid var(--teal);
+  }
+  .blink-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 12px;
+    background: var(--teal);
+    vertical-align: middle;
+    margin-left: 2px;
+    animation: blink 0.65s step-end infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* Empty state */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem;
+    color: var(--text3);
+  }
+  .empty-icon { font-size: 28px; opacity: 0.4; margin-bottom: 8px; }
+  .empty-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+  .empty-desc { font-size: 11px; line-height: 1.5; }
+
+  /* Question detector */
+  .q-detector {
+    padding: 8px 14px;
+    border-bottom: 0.5px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+  }
+  .q-det-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 11px;
+    border-radius: var(--radius);
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+  }
+  .q-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
+  .q-text {
+    flex: 1;
+    font-size: 11px;
+    color: var(--text2);
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .q-text.detected {
+    color: var(--teal-text);
+    font-style: normal;
+  }
+  .q-gen-btn {
+    font-size: 9px;
+    padding: 4px 9px;
+    border-radius: 4px;
+    border: 0.5px solid var(--teal);
+    background: var(--teal-bg);
+    color: var(--teal-text);
+    cursor: pointer;
+    display: none;
+  }
+  .q-gen-btn.show { display: block; }
+
+  /* Answer cards */
+  .answer-card {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    overflow: hidden;
+  }
+  .ac-head {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    gap: 8px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .ac-num { font-size: 14px; font-weight: 600; color: var(--text3); }
+  .ac-question { flex: 1; font-size: 11px; color: var(--text2); font-style: italic; }
+  .ac-badge {
+    font-size: 9px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+  }
+  .ac-badge.stream { background: var(--teal-bg); color: var(--teal-text); }
+  .ac-badge.done { background: var(--bg3); color: var(--text2); }
+  .ac-badge.err { background: var(--red-bg); color: var(--red-text); }
+  .ac-body {
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .ac-footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 12px;
+    border-top: 0.5px solid var(--border);
+    font-size: 10px;
+    color: var(--text3);
+  }
+
+  /* Status bar */
+  .statusbar {
+    display: flex;
+    align-items: center;
+    padding: 0 1.25rem;
+    height: 36px;
+    border-top: 0.5px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+    gap: 16px;
+    font-size: 11px;
+  }
+  .sb-seg { display: flex; align-items: center; gap: 5px; color: var(--text2); }
+  .sb-val { color: var(--text); }
+  .sb-val.accent { color: var(--teal); }
+  .sb-context { flex: 1; display: flex; align-items: center; gap: 8px; }
+  .sb-label { font-size: 10px; color: var(--text3); }
+  .sb-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 11px;
+    outline: none;
+  }
+  .sb-input::placeholder { color: var(--text3); }
+
+  /* Capture button */
+  .btn-capture {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border2);
+    background: var(--teal-bg);
+    color: var(--teal-text);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-capture:hover { opacity: 0.85; }
+  .btn-capture.capturing {
+    background: var(--red-bg);
+    color: var(--red-text);
+  }
+
+  /* Modal */
+  #modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  #modal-overlay.hidden { display: none; }
+  #modal {
+    width: 100%;
+    max-width: 420px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--bg);
+    border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border);
+  }
+  .modal-stripe {
+    height: 3px;
+    background: linear-gradient(90deg, var(--teal), var(--blue), var(--teal));
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+  .modal-body {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .modal-h { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+  .modal-title { font-size: 18px; font-weight: 600; }
+  .modal-title span { color: var(--teal); }
+  .modal-tagline { font-size: 11px; color: var(--text3); }
+
+  .modal-section { }
+  .modal-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 6px;
+  }
+
+  .mfield { display: flex; flex-direction: column; gap: 4px; }
+  .mfield label {
+    font-size: 10px;
+    color: var(--text2);
+  }
+  .mfield input, .mfield select {
+    width: 100%;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 11px;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--bg);
+    outline: none;
+  }
+  .mfield input:focus, .mfield select:focus { border-color: var(--border2); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .upload-zone {
+    border: 0.5px dashed var(--border2);
+    border-radius: var(--radius-lg);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    background: var(--bg2);
+    margin-bottom: 8px;
+  }
+  .upload-zone:hover { background: var(--bg3); }
+  .upload-icon {
+    width: 32px; height: 32px;
+    border-radius: var(--radius);
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text2);
+    flex-shrink: 0;
+  }
+  .upload-text strong { display: block; font-size: 12px; }
+  .upload-text span { font-size: 10px; color: var(--text3); }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg2);
+    border-radius: var(--radius);
+    border: 0.5px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .toggle-label-group { display: flex; flex-direction: column; gap: 1px; }
+  .toggle-label-group strong { font-size: 12px; font-weight: 500; }
+  .toggle-label-group span { font-size: 10px; color: var(--text3); }
+  .toggle {
+    width: 36px; height: 20px;
+    background: var(--bg3);
+    border: 0.5px solid var(--border2);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 14px; height: 14px;
+    background: white;
+    border-radius: 50%;
+    transition: left 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle.on { background: var(--teal); border-color: var(--teal); }
+  .toggle.on::after { left: 18px; }
+
+  .pill-group { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .pill-sublabel { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text3); margin-bottom: 5px; }
+  .pill {
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border2);
+    color: var(--text2);
+    cursor: pointer;
+    background: var(--bg);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .pill:hover { background: var(--bg2); }
+  .pill.active {
+    background: var(--blue-bg);
+    color: var(--blue-text);
+    border-color: transparent;
+  }
+
+  .model-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .model-card {
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    cursor: pointer;
+    background: var(--bg);
+    transition: all 0.15s;
+  }
+  .model-card:hover { background: var(--bg2); }
+  .model-card.active {
+    border-color: var(--blue);
+    background: var(--blue-bg);
+  }
+  .model-card .name { font-size: 11px; font-weight: 500; }
+  .model-card .tag { font-size: 9px; color: var(--text3); margin-top: 2px; }
+
+  .src-pill {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--text2);
+    transition: all 0.15s;
+    border: 0.5px solid var(--border);
+  }
+  .src-pill:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+  .src-pill:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+  .src-pill.active { background: var(--blue-bg); color: var(--blue-text); }
+
+  .btn-launch {
+    width: 100%;
+    padding: 13px;
+    border-radius: var(--radius-lg);
+    background: var(--text);
+    color: var(--bg);
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-launch:hover { opacity: 0.85; }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 14px;
+    border-radius: 20px;
+    background: var(--bg);
+    border: 0.5px solid var(--border);
+    font-size: 11px;
+    color: var(--text);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s;
+    z-index: 200;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+  #toast.ok { color: var(--teal); border-color: var(--teal); }
+  #toast.err { color: var(--red-text); border-color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- SETUP MODAL -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div class="modal-stripe"></div>
+    <div class="modal-body">
+
+      <div class="modal-h">
+        <div>
+          <div class="modal-title">Interview <span>Copilot</span></div>
+          <div class="modal-tagline">Stealth interview assistant</div>
+        </div>
+        <div class="badge badge-stealth">STEALTH MODE</div>
+      </div>
+
+      <!-- Resume -->
+      <div class="modal-section">
+        <div class="modal-section-label">Resume</div>
+        <div class="upload-zone" onclick="document.getElementById('resume-file-input').click()">
+          <div class="upload-icon">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 5l3-3 3 3M3 12h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="upload-text">
+            <strong id="resume-filename">Upload Resume</strong>
+            <span>PDF or DOCX</span>
+          </div>
+          <input type="file" id="resume-file-input" accept=".pdf,.docx" style="display:none"/>
+        </div>
+        <div id="resume-upload-status" style="font-size:10px;color:var(--text3);display:none;"></div>
+      </div>
+
+      <!-- Job Description -->
+      <div class="modal-section">
+        <div class="modal-section-label">Job Description</div>
+        <textarea id="inp-job-desc" rows="3" placeholder="Paste job description..." style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:9px 11px;font-size:12px;color:var(--text);resize:none;line-height:1.5;"></textarea>
+      </div>
+
+      <!-- Session Setup -->
+      <div class="modal-section">
+        <div class="modal-section-label">Session Setup</div>
+        <div class="grid2" style="margin-bottom:10px;">
+          <div class="mfield">
+            <label>Role</label>
+            <select id="inp-role-select">
+              <option value="Software Engineer">Software Engineer</option>
+              <option value="Product Manager">Product Manager</option>
+              <option value="Data Scientist">Data Scientist</option>
+              <option value="UX Designer">UX Designer</option>
+              <option value="Engineering Manager">Engineering Manager</option>
+              <option value="DevOps Engineer">DevOps Engineer</option>
+              <option value="custom">Custom...</option>
+            </select>
+          </div>
+          <div class="mfield">
+            <label>Language</label>
+            <select id="inp-language">
+              <option value="en-US">English</option>
+              <option value="es-ES">Spanish</option>
+              <option value="fr-FR">French</option>
+              <option value="hi-IN">Hindi</option>
+              <option value="de-DE">German</option>
+              <option value="pt-BR">Portuguese</option>
+              <option value="zh-CN">Mandarin</option>
+            </select>
+          </div>
+        </div>
+        <div class="mfield" id="role-custom-wrap" style="display:none;">
+          <label>Custom Role</label>
+          <input type="text" id="inp-role" placeholder="e.g. Senior Backend Engineer"/>
+        </div>
+      </div>
+
+      <!-- AI Model -->
+      <div class="modal-section">
+        <div class="modal-section-label">AI Model</div>
+        <div class="model-grid">
+          <div class="model-card active" data-llm="ollama" data-model="llama3.2" onclick="selectModelCard(this)">
+            <div class="name">Llama 3.2</div>
+            <div class="tag">Local · Free</div>
+          </div>
+          <div class="model-card" data-llm="ollama" data-model="mistral" onclick="selectModelCard(this)">
+            <div class="name">Mistral</div>
+            <div class="tag">Fast · Local</div>
+          </div>
+          <div class="model-card" data-llm="openai" data-model="gpt-4o" onclick="selectModelCard(this)">
+            <div class="name">GPT-4o</div>
+            <div class="tag">Cloud · Best</div>
+          </div>
+        </div>
+        <div class="mfield" id="f-ollama-url" style="margin-top:10px;">
+          <label>Ollama URL</label>
+          <input type="text" id="inp-ollama" value="http://localhost:11434"/>
+        </div>
+        <div class="mfield" id="f-api-fields" style="display:none;margin-top:10px;">
+          <label>API Key</label>
+          <input type="password" id="inp-api-key" placeholder="sk-..."/>
+        </div>
+      </div>
+
+      <!-- Answer Settings -->
+      <div class="modal-section">
+        <div class="modal-section-label">Answer Settings</div>
+        <div class="toggle-row">
+          <div class="toggle-label-group">
+            <strong>Thinking Mode</strong>
+            <span>Deep reasoning</span>
+          </div>
+          <div class="toggle" id="toggle-thinking" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="pill-sublabel">Answer Length</div>
+        <div class="pill-group" id="length-pills">
+          <div class="pill" data-group="length" onclick="selectPill(this)">Short</div>
+          <div class="pill active" data-group="length" onclick="selectPill(this)">Paragraph</div>
+          <div class="pill" data-group="length" onclick="selectPill(this)">Bullet Points</div>
+          <div class="pill" data-group="length" onclick="selectPill(this)">Elaborated</div>
+        </div>
+        <div class="pill-sublabel">Tone</div>
+        <div class="pill-group" id="tone-pills">
+          <div class="pill active" data-group="tone" onclick="selectPill(this)">Professional</div>
+          <div class="pill" data-group="tone" onclick="selectPill(this)">Assertive</div>
+          <div class="pill" data-group="tone" onclick="selectPill(this)">Friendly</div>
+        </div>
+      </div>
+
+      <!-- Audio Source -->
+      <div class="modal-section">
+        <div class="modal-section-label">Audio Source</div>
+        <div style="display:flex;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+          <div class="src-pill active" data-mode="tab" onclick="selectSrcMode(this)">Tab Audio</div>
+          <div class="src-pill" data-mode="mic" onclick="selectSrcMode(this)">Microphone</div>
+          <div class="src-pill" data-mode="both" onclick="selectSrcMode(this)">Both</div>
+        </div>
+      </div>
+
+      <button class="btn-launch" id="btn-launch">Start Interview</button>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1>Interview Copilot</h1>
+    <p>AI-powered stealth assistant</p>
+  </div>
+  <div class="header-right">
+    <div class="badge badge-stealth" id="badge-stealth">STEALTH</div>
+    <div class="badge badge-live" id="badge-live"><span class="live-dot"></span> LIVE</div>
+    <button class="btn-capture" id="btn-capture">
+      <span id="btn-cap-icon">▶</span>
+      <span id="btn-cap-label">Start</span>
+    </button>
+  </div>
+</div>
+
+<!-- PLATFORM SELECTOR -->
+<div class="platform-row">
+  <button class="platform-btn active" data-p="teams">Teams</button>
+  <button class="platform-btn" data-p="zoom">Zoom</button>
+  <button class="platform-btn" data-p="meet">Meet</button>
+  <button class="platform-btn" data-p="other">Other</button>
+</div>
+
+<!-- WORKSPACE -->
+<div class="workspace">
+
+  <!-- LEFT: TRANSCRIPT -->
+  <div class="panel" id="panel-left">
+    <div class="panel-header">
+      <div class="panel-title">Live Transcript</div>
+      <div class="panel-meta">
+        <span id="tx-count" style="font-size:10px;color:var(--text3)">0 segments</span>
+        <button class="btn-icon" onclick="copyTranscript()">Copy</button>
+      </div>
+    </div>
+    <div class="visualizer">
+      <div class="vis-header">
+        <span class="vis-label" id="vis-source-label">No audio</span>
+        <span class="vis-level" id="vis-level-text">0 dB</span>
+      </div>
+      <canvas class="vis-canvas" id="vis-canvas"></canvas>
+    </div>
+    <div class="speaker-track">
+      <div class="speaker-chip speaking" id="sp-you"><span class="sp-dot"></span>YOU</div>
+      <div class="speaker-chip" id="sp-interviewer"><span class="sp-dot"></span>INTERVIEWER</div>
+    </div>
+    <div class="panel-body" id="tx-body">
+      <div class="empty-state" id="tx-empty">
+        <div class="empty-icon">📡</div>
+        <div class="empty-title">No Signal</div>
+        <div class="empty-desc">Click Start to capture audio</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: ANSWERS -->
+  <div class="panel" id="panel-right">
+    <div class="panel-header">
+      <div class="panel-title">AI Answers</div>
+      <div class="panel-meta">
+        <span id="ans-count" style="font-size:10px;color:var(--text3)">0 answers</span>
+      </div>
+    </div>
+    <div class="q-detector">
+      <div class="q-det-inner">
+        <span class="q-label">Q</span>
+        <span class="q-text" id="q-text">Listening...</span>
+        <button class="q-gen-btn" id="q-gen-btn" onclick="generateFromDetected()">Generate</button>
+      </div>
+    </div>
+    <div class="panel-body" id="ans-body">
+      <div class="empty-state" id="ans-empty">
+        <div class="empty-icon">⚡</div>
+        <div class="empty-title">Ready</div>
+        <div class="empty-desc">Questions will be answered here</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="statusbar">
+  <div class="sb-seg">⏱ <span class="sb-val" id="sb-time">00:00</span></div>
+  <div class="sb-seg">Segs <span class="sb-val accent" id="sb-segs">0</span></div>
+  <div class="sb-seg">Answers <span class="sb-val accent" id="sb-ans">0</span></div>
+  <div class="sb-seg">Source <span class="sb-val" id="sb-src">—</span></div>
+  <div class="sb-context">
+    <span class="sb-label">Context</span>
+    <input class="sb-input" id="sb-context-input" placeholder="Add context..."/>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+const CFG = {
+  llm: 'ollama',
+  ollamaUrl: 'http://localhost:11434',
+  model: 'llama3.2',
+  role: '',
+  sourceMode: 'tab',
+  platform: 'teams',
+  language: 'en-US',
+  answerLength: 'Paragraph',
+  answerTone: 'Professional',
+  thinkingMode: false,
+  jobDesc: '',
+  stealthMode: true,
+  backendUrl: 'http://localhost:8001',
+  useBackend: false
+};
+
+const ST = {
+  capturing: false,
+  sessionStart: null,
+  segCount: 0,
+  ansCount: 0,
+  history: [],
+  accumulated: '',
+  silenceTimer: null,
+  audioCtx: null,
+  analyser: null,
+  tabStream: null,
+  micStream: null,
+  recognition: null,
+  rafId: null,
+  wsUi: null,
+  wsAudio: null,
+  waveHistory: new Array(80).fill(0)
+};
+
+function selectModelCard(el) {
+  document.querySelectorAll('.model-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  CFG.llm = el.dataset.llm;
+  CFG.model = el.dataset.model;
+  const isOllama = CFG.llm === 'ollama';
+  document.getElementById('f-ollama-url').style.display = isOllama ? '' : 'none';
+  document.getElementById('f-api-fields').style.display = isOllama ? 'none' : '';
+}
+
+function selectPill(el) {
+  const group = el.dataset.group;
+  el.parentElement.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  if (group === 'length') CFG.answerLength = el.textContent.trim();
+  if (group === 'tone') CFG.answerTone = el.textContent.trim();
+}
+
+function selectSrcMode(el) {
+  document.querySelectorAll('.src-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  CFG.sourceMode = el.dataset.mode;
+}
+
+document.getElementById('inp-role-select').addEventListener('change', function() {
+  document.getElementById('role-custom-wrap').style.display = this.value === 'custom' ? '' : 'none';
+});
+
+document.getElementById('resume-file-input').addEventListener('change', function() {
+  if (!this.files.length) return;
+  document.getElementById('resume-filename').textContent = this.files[0].name;
+  document.getElementById('resume-upload-status').style.display = 'block';
+  document.getElementById('resume-upload-status').textContent = 'Upload ready';
+});
+
+document.getElementById('btn-launch').addEventListener('click', () => {
+  CFG.ollamaUrl = document.getElementById('inp-ollama').value.trim() || 'http://localhost:11434';
+  CFG.language = document.getElementById('inp-language').value;
+  CFG.jobDesc = document.getElementById('inp-job-desc').value.trim();
+  CFG.thinkingMode = document.getElementById('toggle-thinking').classList.contains('on');
+  CFG.role = document.getElementById('inp-role-select').value === 'custom' 
+    ? document.getElementById('inp-role').value.trim() 
+    : document.getElementById('inp-role-select').value;
+  document.getElementById('modal-overlay').classList.add('hidden');
+  onLaunched();
+});
+
+function onLaunched() {
+  ST.sessionStart = Date.now();
+  startSessionTimer();
+  document.getElementById('sb-context-input').value = CFG.role;
+  document.getElementById('sb-src').textContent = CFG.sourceMode.toUpperCase();
+  if (CFG.stealthMode) document.getElementById('badge-stealth').style.display = 'none';
+  document.getElementById('badge-live').classList.add('show');
+  toast('Ready', 'ok');
+}
+
+function startSessionTimer() {
+  setInterval(() => {
+    if (!ST.sessionStart) return;
+    const s = Math.floor((Date.now() - ST.sessionStart) / 1000);
+    document.getElementById('sb-time').textContent = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+  }, 1000);
+}
+
+// Platform buttons
+document.querySelectorAll('.platform-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.platform-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    CFG.platform = btn.dataset.p;
+  });
+});
+
+// Capture button
+document.getElementById('btn-capture').addEventListener('click', async () => {
+  if (ST.capturing) {
+    stopCapture();
+  } else {
+    await startCapture();
+  }
+});
+
+function setBtnCapture(capturing) {
+  const btn = document.getElementById('btn-capture');
+  document.getElementById('btn-cap-icon').textContent = capturing ? '⏹' : '▶';
+  document.getElementById('btn-cap-label').textContent = capturing ? 'Stop' : 'Start';
+  btn.classList.toggle('capturing', capturing);
+}
+
+async function startCapture() {
+  setBtnCapture(true);
+  ST.capturing = true;
+  document.getElementById('vis-source-label').textContent = CFG.sourceMode === 'tab' ? 'Tab Audio' : CFG.sourceMode === 'mic' ? 'Mic' : 'Both';
+  document.getElementById('badge-live').classList.add('show');
+  toast('Capture started', 'ok');
+}
+
+function stopCapture() {
+  ST.capturing = false;
+  setBtnCapture(false);
+  document.getElementById('vis-source-label').textContent = 'No audio';
+  document.getElementById('vis-level-text').textContent = '0 dB';
+  toast('Capture stopped', 'ok');
+}
+
+// Toast
+let toastTimer;
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.textContent = '', 3000);
+}
+
+// Utility
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Modal starts hidden, show on load
+// document.getElementById('modal-overlay').classList.add('hidden');
+</script>
