@@ -560,7 +560,7 @@ async def groq_transcription_worker():
 
     # Buffer for accumulating audio
     audio_buffer = bytearray()
-    current_utterance_id = str(uuid.uuid4())
+    current_utterance_id = None  # Will generate at start of each speech turn
     CHUNK_DURATION_MS = 5000
     BYTES_PER_SECOND = SAMPLE_RATE * 2
     SILENCE_FLUSH_SECONDS = 1
@@ -570,6 +570,8 @@ async def groq_transcription_worker():
     MAX_QUEUE_SIZE = 10
     last_sent_text = ""
     current_transcript_buffer = ""
+    last_speech_end_time = 0.0
+    TURN_SILENCE_GAP = 2.0  # 2 seconds of silence = new speech turn
 
     # Deduplication
     last_transcript = ""
@@ -579,6 +581,10 @@ async def groq_transcription_worker():
         {"thank you very much.", "of anybody.", "thank you.", "thanks."}
     )
     silence_repeat_count = 0
+
+    def generate_turn_id() -> str:
+        """Generate new UUID for each speech turn."""
+        return str(uuid.uuid4())
 
     def is_similar(a: str, b: str) -> bool:
         """Check if two strings are 90% similar."""
@@ -670,6 +676,21 @@ async def groq_transcription_worker():
                 logger.info("[WHISPER_WORKER] No speech detected")
                 continue
 
+            # Turn-based UUIDs: Generate new ID at start of each speech turn
+            current_time = time.time()
+            if current_utterance_id is None:
+                # Check for silence gap - new speech turn
+                if (
+                    last_speech_end_time > 0
+                    and (current_time - last_speech_end_time) > TURN_SILENCE_GAP
+                ):
+                    current_utterance_id = generate_turn_id()
+                    logger.info(
+                        f"[WHISPER_WORKER] New speech turn: {current_utterance_id}"
+                    )
+                else:
+                    current_utterance_id = generate_turn_id()
+
             interim_payload = {
                 "type": "transcript",
                 "utterance_id": current_utterance_id,
@@ -750,16 +771,23 @@ async def groq_transcription_worker():
                     if len(transcript_history) > MAX_HISTORY:
                         transcript_history.pop(0)
 
-                    # 5. Buffer Reset: clear after final (hard reset)
+                    # 5. Hard Buffer Flush: immediately after is_final (prevent text bleeding)
                     current_transcript_buffer = ""
+                    last_speech_end_time = (
+                        time.time()
+                    )  # Track speech end for turn detection
                     last_sent_text = text
-                    current_utterance_id = ""  # Clear ID to force fresh uuid4()
+                    current_utterance_id = (
+                        None  # Clear to generate new UUID on next speech
+                    )
 
                     connection_manager.broadcast_task("ui", transcript_payload)
                     await connection_manager.broadcast_to_ui(transcript_payload)
-                    logger.info(f"[HUD_RELAY] Transcript broadcast complete")
+                    logger.info(
+                        f"[HUD_RELAY] Transcript broadcast complete (ID: {transcript_payload['utterance_id']})"
+                    )
 
-                # 6. Gate LLM call - only generate for substantial questions
+                # 6. Non-Blocking AI Task: wrap in asyncio.create_task()
                 words = text.split()
                 if not should_generate_answer(text):
                     logger.info(
@@ -772,13 +800,10 @@ async def groq_transcription_worker():
                         f"[GROQ_WORKER] Words: {len(words)}, firing Ollama async..."
                     )
 
-                    # Generate fresh utterance_id for next speech BEFORE async task
-                    current_utterance_id = str(uuid.uuid4())
-
-                    # Fire and forget - don't await, use create_task
+                    # Non-blocking: wrap in create_task() so AI never blocks heartbeat
                     async def safe_ollama_call():
                         try:
-                            # Pass last 3 segments as context for better RAG
+                            # Rephrase last 3 segments for better RAG search
                             await process_brain_ollama(text, transcript_history)
                         except Exception as e:
                             logger.error(f"[GROQ_WORKER] Ollama failed: {e}")
@@ -866,17 +891,53 @@ async def process_brain_ollama(transcript: str, context_segments: list[str] = No
     """
     try:
         ollama_url = OLLAMA_API
-        RAG_TIMEOUT = 0.4  # 400ms max wait for RAG
+        RAG_TIMEOUT = 0.5  # 500ms max wait for RAG
+        REWRITE_TIMEOUT = 0.8  # 800ms for LLM rewrite
 
-        def sync_rag_search():
+        async def rephrase_for_search(query: str, history: list[str]) -> str:
+            """Rephrase transcript into standalone search query using LLM."""
+            context = " ".join(history[-3:]) if history else ""
+            rewrite_prompt = f"""Given this conversation history and current question, create a standalone search query that captures the key information need. 
+
+History: {context}
+
+Current: {query}
+
+Respond with ONLY the rephrased query. No explanation. 3-10 words."""
+
+            try:
+                async with httpx.AsyncClient(timeout=REWRITE_TIMEOUT) as client:
+                    resp = await client.post(
+                        ollama_url,
+                        json={
+                            "model": "llama3.2:1b",
+                            "prompt": rewrite_prompt,
+                            "stream": False,
+                            "options": {"num_predict": 30},
+                        },
+                    )
+                    if resp.status_code == 200:
+                        rephrased = resp.json().get("response", "").strip()
+                        logger.info(f"[RAG] Rephrased: '{rephrased}'")
+                        return rephrased
+            except Exception as e:
+                logger.warning(f"[RAG] Rewrite failed: {e}")
+            return query.strip()
+
+        async def sync_rag_search():
             """Synchronous RAG search - runs in thread pool"""
+            # First rephrase for better search
+            search_query = await rephrase_for_search(
+                transcript, transcript_history or []
+            )
+
             raw_results = knowledge_base.search(
-                transcript, top_k=5, context_segments=context_segments
+                search_query, top_k=5, context_segments=context_segments
             )
             has_high_score = any(r.get("score", 0) > 0.5 for r in raw_results)
             if has_high_score:
                 return knowledge_base.search_context(
-                    transcript, top_k=5, context_segments=context_segments
+                    search_query, top_k=5, context_segments=context_segments
                 )
             elif (
                 hasattr(knowledge_base, "resume_summary")
@@ -897,7 +958,7 @@ IMPORTANT: The transcript is from a live interview; ignore minor phonetic errors
 Use specific examples from the provided context that match what the interviewer is asking about.
 Provide 2-3 concise bullet points starting with action verbs."""
 
-        # Wait up to 400ms for RAG
+        # Wait up to 500ms for RAG
         try:
             context = await asyncio.wait_for(rag_task, timeout=RAG_TIMEOUT)
         except asyncio.TimeoutError:
