@@ -1487,8 +1487,8 @@ function copyCard(btn) {
 function showAlert(msg) {
   toast(msg, 'err');
 }
-
-document.addEventListener('keydown', e => {
+// End of main script
+document.addEventListener('keydown', function(e) {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (document.getElementById('modal-overlay').classList.contains('hidden') === false) return;
   if (e.code === 'Space') { e.preventDefault(); document.getElementById('btn-capture').click(); }
