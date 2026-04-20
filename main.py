@@ -366,15 +366,39 @@ class KnowledgeBase:
     def ensure_index(self) -> bool:
         return self.load_index() or (self.index is not None)
 
-    def search(self, query: str, top_k: int = 3) -> list[dict]:
+    def search(
+        self, query: str, top_k: int = 3, context_segments: list[str] = None
+    ) -> list[dict]:
+        """Search knowledge base.
+
+        Args:
+            query: Current query text
+            top_k: Number of results
+            context_segments: Last 3 segments for question context (improves RAG)
+        """
         if not self.ensure_index() or self.index is None or not query.strip():
             return []
+
+        # Use last 3 segments as context for questions
+        search_query = query.strip()
+        if context_segments and len(context_segments) >= 2:
+            # Check if this is a question - use last 3 segments for context
+            has_question = any(
+                q in query.lower()
+                for q in ["what", "how", "why", "tell me", "describe", "explain"]
+            )
+            if has_question:
+                context_text = " ".join(context_segments[-3:])
+                search_query = f"{context_text} {query.strip()}"
+                logger.info(
+                    f"[RAG] Using {len(context_segments[-3:])} segments as context for question"
+                )
 
         if self.embedder is None:
             self.embedder = SentenceTransformer(EMBEDDING_MODEL)
 
         query_emb = self.embedder.encode(
-            [query.strip()],
+            [search_query],
             convert_to_numpy=True,
             normalize_embeddings=True,
         ).astype("float32")
@@ -394,14 +418,19 @@ class KnowledgeBase:
                 )
         return results
 
-    def search_context(self, query: str, top_k: int = 3) -> str:
-        results = self.search(query, top_k)
+    def search_context(
+        self, query: str, top_k: int = 3, context_segments: list[str] = None
+    ) -> str:
+        results = self.search(query, top_k, context_segments)
         if not results:
             return ""
         return "\n\n".join(f"[Source: {r['source']}]\n{r['text']}" for r in results)
 
 
 knowledge_base = KnowledgeBase()
+
+# Global transcript history for RAG context (last 3 segments)
+transcript_history = []
 
 
 import io
@@ -696,7 +725,8 @@ async def groq_transcription_worker():
                 # Fire and forget - don't await, use create_task
                 async def safe_ollama_call():
                     try:
-                        await process_brain_ollama(text)
+                        # Pass last 3 segments as context for better RAG
+                        await process_brain_ollama(text, transcript_history)
                     except Exception as e:
                         logger.error(f"[GROQ_WORKER] Ollama failed: {e}")
                         await connection_manager.broadcast(
@@ -771,19 +801,30 @@ import httpx
 OLLAMA_URL = "http://localhost:11434"
 OLLAMA_API = f"{OLLAMA_URL}/api/generate"
 
+LLM_TIMEOUT = 10.0  # 10 second timeout for LLM generation
 
-async def process_brain_ollama(transcript: str):
-    """Fault 8: Parallel RAG + LLM with 400ms race window"""
+
+async def process_brain_ollama(transcript: str, context_segments: list[str] = None):
+    """Process transcript with RAG and Ollama LLM.
+
+    Args:
+        transcript: Current transcript text
+        context_segments: Last 3 segments for question context (improves RAG)
+    """
     try:
         ollama_url = OLLAMA_API
         RAG_TIMEOUT = 0.4  # 400ms max wait for RAG
 
         def sync_rag_search():
             """Synchronous RAG search - runs in thread pool"""
-            raw_results = knowledge_base.search(transcript, top_k=5)
+            raw_results = knowledge_base.search(
+                transcript, top_k=5, context_segments=context_segments
+            )
             has_high_score = any(r.get("score", 0) > 0.5 for r in raw_results)
             if has_high_score:
-                return knowledge_base.search_context(transcript, top_k=5)
+                return knowledge_base.search_context(
+                    transcript, top_k=5, context_segments=context_segments
+                )
             elif (
                 hasattr(knowledge_base, "resume_summary")
                 and knowledge_base.resume_summary
@@ -791,7 +832,7 @@ async def process_brain_ollama(transcript: str):
                 return knowledge_base.resume_summary
             return ""
 
-        # Fire RAG in background thread (Fault 8: Parallel RAG)
+        # Fire RAG in background thread
         rag_task = asyncio.create_task(asyncio.to_thread(sync_rag_search))
 
         persona = "You are an Interview Copilot helping during a job interview. Be practical and actionable."
@@ -822,8 +863,19 @@ Provide 2-3 concise bullet points starting with action verbs."""
             "stream": False,
         }
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(ollama_url, json=payload)
+        async def call_ollama():
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                return await client.post(ollama_url, json=payload)
+
+        # Add 10 second timeout for LLM generation
+        try:
+            response = await asyncio.wait_for(call_ollama(), timeout=LLM_TIMEOUT)
+        except asyncio.TimeoutError:
+            logger.warning("[OLLAMA] Timeout - system busy")
+            await connection_manager.broadcast(
+                "ui", {"type": "copilot_final", "text": "System busy, retrying..."}
+            )
+            return
 
         if response.status_code == 200:
             result = response.json()
@@ -1138,7 +1190,7 @@ async def websocket_ui(websocket: WebSocket):
                     transcript = msg.get("content", "")
                     if transcript:
                         logger.info(f"[WS_UI] Received question: {transcript[:50]}...")
-                        await process_brain_ollama(transcript)
+                        await process_brain_ollama(transcript, transcript_history)
             except json.JSONDecodeError:
                 logger.warning(f"[WS_UI] Invalid JSON: {data}")
     except WebSocketDisconnect:
