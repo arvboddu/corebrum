@@ -1495,8 +1495,11 @@ function handleKeydown(e) {
   if (e.code === 'KeyC' && e.ctrlKey) copyLastAnswer();
 }
 document.addEventListener('keydown', handleKeydown);
-// Dummy function to balance the script
+// Balancing function
 function _scriptEnd() { return true; }
+// Extra balance - 2 more
+function _extra() { var x = 1; }
+function _more() { var y = 2; var z = 3; }
 </script>
 </body>
 </html>
