@@ -1491,14 +1491,15 @@ const ST = {
   recognition: null,
   rafId: null,
   waveHistory: new Array(80).fill(0),
-  // WebSocket reconnect
+// WebSocket reconnect
   wsUi: null,
+  wsAudio: null,
   wsReconnectDelay: 1000,
   wsReconnectTimer: null,
   resumeIndexed: false,
-  // State manager for deduplication
   finalizedIds: new Set(),
-  _backendLiveNodes: {}
+  _backendLiveNodes: {},
+  _audioProcessor: null
 };
 
 // ===
@@ -1702,6 +1703,40 @@ function connectBackendWS() {
     ST.wsUi = ws;
   } catch(e) {
     CFG.useBackend = false;
+  }
+}
+
+// Audio WebSocket for streaming to backend
+function connectAudioWS() {
+  if (ST.wsAudio && ST.wsAudio.readyState === WebSocket.OPEN) return;
+  
+  const wsUrl = CFG.backendUrl.replace('http', 'ws') + '/ws/audio';
+  console.log('[WS_AUDIO] Connecting to:', wsUrl);
+  
+  try {
+    const ws = new WebSocket(wsUrl);
+    ws.onopen = () => {
+      console.log('[WS_AUDIO] Connected!');
+      toast('Audio stream connected', 'ok');
+    };
+    ws.onclose = () => {
+      ST.wsAudio = null;
+      console.log('[WS_AUDIO] Disconnected');
+    };
+    ws.onerror = (e) => {
+      console.error('[WS_AUDIO] Error:', e);
+    };
+    ST.wsAudio = ws;
+  } catch(e) {
+    console.error('[WS_AUDIO] Failed to connect:', e);
+  }
+}
+
+function sendAudioChunk(audioData) {
+  if (ST.wsAudio && ST.wsAudio.readyState === WebSocket.OPEN) {
+    // Debug: log audio buffer size
+    console.log('[WS_AUDIO] Sending buffer size:', audioData.byteLength || audioData.length);
+    ST.wsAudio.send(audioData);
   }
 }
 
@@ -1966,9 +2001,15 @@ async function startCapture() {
   setChip('stt', 'live');
   setListeningIndicator(true);
   if (!CFG.useBackend) {
+    console.log('[CAPTURE] Using browser Web Speech API (CFG.useBackend=false)');
     startSpeechRecognition();
   } else {
+    console.log('[CAPTURE] Using backend STT via WebSocket (CFG.useBackend=true)');
     toast('Backend STT active - Corebrum handling transcription', 'info');
+    // Connect audio WebSocket if not already connected
+    if (!ST.wsAudio || ST.wsAudio.readyState !== WebSocket.OPEN) {
+      connectAudioWS();
+    }
   }
   toast('Capture started', 'ok');
 }
@@ -2035,6 +2076,45 @@ function setupAudioAnalyser(stream) {
   ST.analyser.fftSize = 512;
   source.connect(ST.analyser);
   drawLiveWave(ST.analyser);
+  // Set up audio worklet for streaming to backend
+  setupAudioWorklet(stream);
+}
+
+async function setupAudioWorklet(stream) {
+  if (!ST.audioCtx) return;
+  try {
+    const workletCode = `
+      class PCMProcessor extends AudioWorkletProcessor {
+        process(inputs, outputs, parameters) {
+          const input = inputs[0];
+          if (input && input.length > 0) {
+            const channelData = input[0];
+            const pcmData = new Int16Array(channelData.length);
+            for (let i = 0; i < channelData.length; i++) {
+              pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(channelData[i] * 32768)));
+            }
+            this.port.postMessage(pcmData.buffer, [pcmData.buffer]);
+          }
+          return true;
+        }
+      }
+      registerProcessor('pcm-processor', PCMProcessor);
+    `;
+    const blob = new Blob([workletCode], { type: 'application/javascript' });
+    const workletUrl = URL.createObjectURL(blob);
+    await ST.audioCtx.audioWorklet.addModule(workletUrl);
+    const pcmNode = new AudioWorkletNode(ST.audioCtx, 'pcm-processor');
+    pcmNode.port.onmessage = (e) => {
+      if (CFG.useBackend) sendAudioChunk(e.data);
+    };
+    const source = ST.audioCtx.createMediaStreamSource(stream);
+    source.connect(pcmNode);
+    pcmNode.connect(ST.audioCtx.destination);
+    ST._audioProcessor = { node: pcmNode, url: workletUrl };
+    console.log('[AUDIO] Worklet configured');
+  } catch (e) {
+    console.error('[AUDIO] Worklet failed:', e);
+  }
 }
 
 // ===
