@@ -1046,6 +1046,15 @@ function setBtnCapture(capturing) {
   btn.classList.toggle('capturing', capturing);
 }
 
+// Capture button event listener
+document.getElementById('btn-capture').addEventListener('click', async () => {
+  if (ST.capturing) {
+    stopCapture();
+  } else {
+    await startCapture();
+  }
+});
+
 function setChip(id, state) {
   const chip = document.getElementById('chip-' + id) || document.getElementById('badge-live');
   if (!chip) return;
