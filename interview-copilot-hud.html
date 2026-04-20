@@ -741,7 +741,8 @@ const ST = {
   resumeIndexed: false,
   _audioProcessor: null,
   _copilotCard: null,
-  _backendLiveNodes: {}
+  _backendLiveNodes: {},
+  finalizedIds: new Set()
 };
 
 function selectModelCard(el) {
@@ -1487,13 +1488,15 @@ function copyCard(btn) {
 function showAlert(msg) {
   toast(msg, 'err');
 }
-// End of main script
-document.addEventListener('keydown', function(e) {
+function handleKeydown(e) {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (document.getElementById('modal-overlay').classList.contains('hidden') === false) return;
   if (e.code === 'Space') { e.preventDefault(); document.getElementById('btn-capture').click(); }
   if (e.code === 'KeyC' && e.ctrlKey) copyLastAnswer();
-});
+}
+document.addEventListener('keydown', handleKeydown);
+// Dummy function to balance the script
+function _scriptEnd() { return true; }
 </script>
 </body>
 </html>
