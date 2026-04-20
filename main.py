@@ -632,14 +632,16 @@ async def groq_transcription_worker():
             audio_data = await transcript_queue.get()
             receive_time = time.time()
             data_len = len(audio_data)
-            logger.info(f"[WHISPER_WORKER] Got {data_len} bytes (queue: {queue_size})")
+            logger.info(
+                f"[WHISPER_WORKER] Got {data_len} bytes, total buffered: {len(audio_buffer)}"
+            )
 
             # VAD: skip chunks with no voice activity
             has_speech, speech_level = detect_voice_activity(audio_data)
             if not has_speech:
                 logger.info("[WHISPER_WORKER] No voice activity, skipping chunk")
                 continue
-            logger.info(f"[AUDIO] Speech detected (Level: {speech_level:.1f})")
+            logger.info(f"[VAD] Speech detected (Level: {speech_level:.1f})")
 
             audio_buffer.extend(audio_data)
 
