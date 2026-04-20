@@ -1358,11 +1358,20 @@ async def websocket_audio(websocket: WebSocket):
     try:
         while True:
             msg = await websocket.receive()
-            logger.info(
-                f"[WS_AUDIO] Raw message received"
-            )  # Always log that we got something
 
-            if msg.get("type") == "text":
+            # Handle binary audio data
+            if msg.get("type") == "bytes":
+                data = msg.get("bytes")
+                if data is None:
+                    continue
+                chunk_counter += 1
+                data_len = len(data)
+
+                logger.info(f"[WS_AUDIO] Got {data_len} bytes (chunk #{chunk_counter})")
+                await transcript_queue.put(data)
+                last_byte_time = time.time()
+
+            elif msg.get("type") == "text":
                 text_data = msg.get("text", "")
                 logger.info(f"[WS_AUDIO] Text message: {text_data[:100]}")
                 try:
@@ -1381,30 +1390,6 @@ async def websocket_audio(websocket: WebSocket):
                         logger.debug("[WS_AUDIO] Received pong from client")
                 except json.JSONDecodeError:
                     logger.warning(f"[WS_AUDIO] Non-JSON text: {text_data[:100]}")
-
-            elif msg.get("type") == "websocket.receive" and "bytes" in msg:
-                data = msg.get("bytes")
-                if data is None:
-                    logger.warning(
-                        f"[WS_AUDIO] bytes message but no data in msg keys: {msg.keys()}"
-                    )
-                    continue
-                chunk_counter += 1
-                data_len = len(data)
-
-                if data_len < 2 or data_len > 1_000_000:
-                    logger.warning(f"[WS_AUDIO] Invalid chunk size: {data_len}")
-                    continue
-
-                if chunk_counter % 10 == 0:
-                    logger.info(
-                        f"[WS_AUDIO] Receiving audio: {data_len} bytes (chunk #{chunk_counter})"
-                    )
-                else:
-                    logger.debug(f"[WS_AUDIO] Queuing {data_len} bytes (VAD bypassed)")
-
-                await transcript_queue.put(data)
-                last_byte_time = time.time()  # Reset timer on new data
 
     except WebSocketDisconnect:
         logger.info("[WS_AUDIO] Chrome Extension disconnected - scheduling reconnect")
