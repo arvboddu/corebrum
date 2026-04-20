@@ -487,6 +487,16 @@ body::after {
   letter-spacing: 0.1em;
 }
 
+#vis-source-label.listening {
+  animation: pulse-text 1s ease-in-out infinite;
+  color: var(--teal);
+}
+
+@keyframes pulse-text {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
 #vis-level-text {
   font-size: 9px;
   color: var(--text-low);
@@ -1954,6 +1964,7 @@ async function startCapture() {
     mode === 'tab' ? '📺 Tab Audio' : mode === 'mic' ? '🎙 Microphone' : '🔀 Tab + Mic';
 
   setChip('stt', 'live');
+  setListeningIndicator(true);
   if (!CFG.useBackend) {
     startSpeechRecognition();
   } else {
@@ -2033,6 +2044,7 @@ function stopCapture() {
   ST.capturing = false;
   setBtnCapture(false);
   setChip('stt', 'idle');
+  setListeningIndicator(false);
 
   if (ST.recognition) { try { ST.recognition.stop(); } catch(e){} ST.recognition = null; }
   if (ST.tabStream) { ST.tabStream.getTracks().forEach(t=>t.stop()); ST.tabStream = null; }
@@ -2464,6 +2476,20 @@ function setChip(which, state) {
   if (state === 'proc')  el.classList.add('proc');
   if (state === 'warn')  el.classList.add('warn');
   if (state === 'err')   el.classList.add('err');
+}
+
+// UI Feedback: Toggle listening indicator
+function setListeningIndicator(active) {
+  const el = document.getElementById('vis-source-label');
+  if (el) {
+    if (active) {
+      el.textContent = 'Listening...';
+      el.classList.add('listening');
+    } else {
+      el.textContent = 'No audio';
+      el.classList.remove('listening');
+    }
+  }
 }
 
 // ===
