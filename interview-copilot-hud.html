@@ -1686,18 +1686,27 @@ function handleBackendTranscript(msg) {
   // Fail-safe ID: Generate temp hash if missing
   let uid = msg.utterance_id || msg.id;
   if (!uid) {
-    // Generate hash from text as fallback
     uid = 'txt-' + (msg.text || '').slice(0, 20).replace(/\s+/g, '-');
   }
   
-  // Deduplication Set: Discard if already finalized
+  // Deduplication Set: Discard if already finalized (Drop Rule)
   if (ST.finalizedIds.has(uid)) {
-    console.log('[HUD] Discarding duplicate:', uid);
+    console.log('[HUD] Discarding duplicate final:', uid);
     return;
   }
   
-  // Update-or-Create: Check DOM by id
+  // Speaker Lock: Check if this turn was already locked as INTERVIEWER
   const existingEl = document.getElementById('tx-' + uid);
+  let speakerLocked = false;
+  if (existingEl) {
+    const whoLabel = existingEl.querySelector('.tx-who');
+    if (whoLabel && whoLabel.classList.contains('them')) {
+      speakerLocked = true;
+    }
+  }
+  
+  // Determine speaker (use locked speaker or use incoming)
+  const speaker = speakerLocked ? 'INTERVIEWER' : (msg.speaker || 'YOU');
   
   if (!msg.is_final) {
     // Live transcript update
@@ -1707,13 +1716,12 @@ function handleBackendTranscript(msg) {
         bubble.innerHTML = esc(msg.text) + '<span class="blink-cursor"></span>';
       }
     } else {
-      // Create new bubble
-      const el = addTxEntry(msg.text, 'live', msg.speaker || 'YOU');
+      const el = addTxEntry(msg.text, 'live', speaker);
       el.id = 'tx-' + uid;
       ST._backendLiveNodes[uid] = el;
     }
   } else {
-    // Finalization: Add to Set, change CSS class, stop animation
+    // Finalization: Add to Set, lock speaker, change CSS class
     ST.finalizedIds.add(uid);
     
     if (existingEl) {
@@ -1721,7 +1729,7 @@ function handleBackendTranscript(msg) {
       const typeLabel = existingEl.querySelector('.tx-type');
       if (bubble) {
         bubble.textContent = msg.text;
-        bubble.innerHTML = esc(msg.text); // Remove blink cursor
+        bubble.innerHTML = esc(msg.text);
       }
       if (typeLabel) {
         typeLabel.textContent = 'FINAL';
@@ -1730,15 +1738,16 @@ function handleBackendTranscript(msg) {
       existingEl.classList.add('finalized');
       existingEl.classList.remove('live');
     } else {
-      // Create final bubble if doesn't exist
-      const el = addTxEntry(msg.text, 'final', msg.speaker || 'YOU');
+      const el = addTxEntry(msg.text, 'final', speaker);
       el.id = 'tx-' + uid;
+      // Lock the speaker for this ID
+      if (speaker === 'INTERVIEWER') {
+        const whoLabel = el.querySelector('.tx-who');
+        if (whoLabel) whoLabel.classList.add('them');
+      }
     }
     
-    // Clean up live node tracking
     delete ST._backendLiveNodes[uid];
-    
-    // Trigger question detection
     detectQuestion(msg.text);
   }
 }
