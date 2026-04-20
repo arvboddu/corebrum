@@ -25,9 +25,11 @@
     --blue-text: #185fa5;
     --red-bg: #fcebeb;
     --red-text: #a32d2d;
+    --amber: #d97706;
+    --green: #22c55e;
     --radius: 8px;
     --radius-lg: 12px;
-    --mono: 'SF Mono', Monaco, 'Courier New', monospace;
+    --mono: 'SF Mono', Monaco, monospace;
     --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
@@ -69,21 +71,9 @@
     background: var(--bg);
     flex-shrink: 0;
   }
-  .header-left h1 {
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-  .header-left p {
-    font-size: 11px;
-    color: var(--text3);
-    margin-top: 2px;
-  }
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+  .header-left h1 { font-size: 16px; font-weight: 600; }
+  .header-left p { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
   .badge {
     font-size: 10px;
     font-weight: 600;
@@ -91,10 +81,7 @@
     padding: 4px 10px;
     border-radius: 20px;
   }
-  .badge-stealth {
-    background: var(--red-bg);
-    color: var(--red-text);
-  }
+  .badge-stealth { background: var(--red-bg); color: var(--red-text); }
   .badge-live {
     background: var(--teal-bg);
     color: var(--teal-text);
@@ -111,11 +98,10 @@
   }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-  /* Platform selector */
   .platform-row {
     display: flex;
     gap: 6px;
-    padding: 0 1.25rem 1rem;
+    padding: 0 1.25rem 0.75rem;
     border-bottom: 0.5px solid var(--border);
     background: var(--bg2);
   }
@@ -127,16 +113,32 @@
     background: var(--bg);
     color: var(--text2);
     cursor: pointer;
-    transition: all 0.15s;
   }
   .platform-btn:hover { background: var(--bg3); }
   .platform-btn.active {
     background: var(--blue-bg);
     color: var(--blue-text);
-    border-color: transparent;
   }
 
-  /* Main layout */
+  .src-row {
+    display: flex;
+    padding: 0 1.25rem 0.75rem;
+    gap: 8px;
+  }
+  .src-pill {
+    font-size: 10px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--bg);
+    color: var(--text2);
+    cursor: pointer;
+  }
+  .src-pill.active {
+    background: var(--blue-bg);
+    color: var(--blue-text);
+  }
+
   .workspace {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -153,7 +155,6 @@
     min-height: 0;
   }
 
-  /* Panel header */
   .panel-header {
     display: flex;
     align-items: center;
@@ -162,15 +163,8 @@
     border-bottom: 0.5px solid var(--border);
     flex-shrink: 0;
   }
-  .panel-title {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-  .panel-meta {
-    display: flex;
-    gap: 6px;
-  }
+  .panel-title { font-size: 12px; font-weight: 600; }
+  .panel-meta { display: flex; gap: 6px; }
   .btn-icon {
     font-size: 10px;
     padding: 4px 8px;
@@ -180,30 +174,18 @@
     color: var(--text2);
     cursor: pointer;
   }
-  .btn-icon:hover { background: var(--bg3); }
 
-  /* Audio visualizer */
   .visualizer {
     padding: 10px 14px;
     border-bottom: 0.5px solid var(--border);
     background: var(--bg2);
     flex-shrink: 0;
   }
-  .vis-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 6px;
-  }
+  .vis-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
   .vis-label { font-size: 10px; color: var(--text3); }
   .vis-level { font-size: 10px; color: var(--text2); font-family: var(--mono); }
-  .vis-canvas {
-    width: 100%;
-    height: 36px;
-    border-radius: 6px;
-    background: var(--bg);
-  }
+  .vis-canvas { width: 100%; height: 36px; border-radius: 6px; background: var(--bg); }
 
-  /* Speaker track */
   .speaker-track {
     display: flex;
     gap: 6px;
@@ -223,24 +205,14 @@
     font-size: 10px;
     color: var(--text2);
     white-space: nowrap;
-    cursor: pointer;
   }
   .speaker-chip.speaking {
     background: var(--teal-bg);
     color: var(--teal-text);
-    border-color: transparent;
   }
-  .sp-dot {
-    width: 5px; height: 5px;
-    border-radius: 50%;
-    background: var(--text3);
-  }
-  .speaker-chip.speaking .sp-dot {
-    background: var(--teal);
-    animation: pulse 1s infinite;
-  }
+  .sp-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text3); }
+  .speaker-chip.speaking .sp-dot { background: var(--teal); animation: pulse 1s infinite; }
 
-  /* Panel body */
   .panel-body {
     flex: 1;
     overflow-y: auto;
@@ -250,37 +222,12 @@
     gap: 8px;
   }
 
-  /* Transcript entry */
-  .tx-entry {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-  .tx-meta {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .tx-who {
-    font-size: 9px;
-    font-weight: 600;
-    color: var(--blue-text);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
+  .tx-entry { display: flex; flex-direction: column; gap: 3px; }
+  .tx-meta { display: flex; align-items: center; gap: 6px; }
+  .tx-who { font-size: 9px; font-weight: 600; color: var(--blue-text); text-transform: uppercase; letter-spacing: 0.05em; }
   .tx-who.them { color: var(--text3); }
-  .tx-ts {
-    font-size: 8px;
-    color: var(--text3);
-    font-style: italic;
-  }
-  .tx-type {
-    font-size: 8px;
-    padding: 2px 6px;
-    border-radius: 3px;
-    text-transform: uppercase;
-    margin-left: auto;
-  }
+  .tx-ts { font-size: 8px; color: var(--text3); font-style: italic; }
+  .tx-type { font-size: 8px; padding: 2px 6px; border-radius: 3px; text-transform: uppercase; margin-left: auto; }
   .tx-type.live { background: var(--teal-bg); color: var(--teal-text); }
   .tx-type.final { background: var(--blue-bg); color: var(--blue-text); }
   .tx-bubble {
@@ -291,23 +238,10 @@
     background: var(--bg2);
     border: 0.5px solid var(--border);
   }
-  .tx-bubble.live {
-    font-style: italic;
-    color: var(--text2);
-    border-left: 2px solid var(--teal);
-  }
-  .blink-cursor {
-    display: inline-block;
-    width: 2px;
-    height: 12px;
-    background: var(--teal);
-    vertical-align: middle;
-    margin-left: 2px;
-    animation: blink 0.65s step-end infinite;
-  }
+  .tx-bubble.live { font-style: italic; color: var(--text2); border-left: 2px solid var(--teal); }
+  .blink-cursor { display: inline-block; width: 2px; height: 12px; background: var(--teal); vertical-align: middle; margin-left: 2px; animation: blink 0.65s step-end infinite; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
 
-  /* Empty state */
   .empty-state {
     flex: 1;
     display: flex;
@@ -322,7 +256,6 @@
   .empty-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
   .empty-desc { font-size: 11px; line-height: 1.5; }
 
-  /* Question detector */
   .q-detector {
     padding: 8px 14px;
     border-bottom: 0.5px solid var(--border);
@@ -339,19 +272,8 @@
     border: 0.5px solid var(--border);
   }
   .q-label { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
-  .q-text {
-    flex: 1;
-    font-size: 11px;
-    color: var(--text2);
-    font-style: italic;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .q-text.detected {
-    color: var(--teal-text);
-    font-style: normal;
-  }
+  .q-text { flex: 1; font-size: 11px; color: var(--text2); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .q-text.detected { color: var(--teal-text); font-style: normal; }
   .q-gen-btn {
     font-size: 9px;
     padding: 4px 9px;
@@ -364,46 +286,22 @@
   }
   .q-gen-btn.show { display: block; }
 
-  /* Answer cards */
   .answer-card {
     border: 0.5px solid var(--border);
     border-radius: var(--radius);
     background: var(--bg);
     overflow: hidden;
   }
-  .ac-head {
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    gap: 8px;
-    border-bottom: 0.5px solid var(--border);
-  }
+  .ac-head { display: flex; align-items: center; padding: 8px 12px; gap: 8px; border-bottom: 0.5px solid var(--border); }
   .ac-num { font-size: 14px; font-weight: 600; color: var(--text3); }
-  .ac-question { flex: 1; font-size: 11px; color: var(--text2); font-style: italic; }
-  .ac-badge {
-    font-size: 9px;
-    padding: 3px 8px;
-    border-radius: 20px;
-    text-transform: uppercase;
-  }
+  .ac-question { flex: 1; font-size: 11px; color: var(--text2); font-style: italic; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+  .ac-badge { font-size: 9px; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; }
   .ac-badge.stream { background: var(--teal-bg); color: var(--teal-text); }
   .ac-badge.done { background: var(--bg3); color: var(--text2); }
   .ac-badge.err { background: var(--red-bg); color: var(--red-text); }
-  .ac-body {
-    padding: 12px;
-    font-size: 12px;
-    line-height: 1.6;
-  }
-  .ac-footer {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 12px;
-    border-top: 0.5px solid var(--border);
-    font-size: 10px;
-    color: var(--text3);
-  }
+  .ac-body { padding: 12px; font-size: 12px; line-height: 1.6; }
+  .ac-footer { display: flex; justify-content: space-between; padding: 6px 12px; border-top: 0.5px solid var(--border); font-size: 10px; color: var(--text3); }
 
-  /* Status bar */
   .statusbar {
     display: flex;
     align-items: center;
@@ -420,17 +318,9 @@
   .sb-val.accent { color: var(--teal); }
   .sb-context { flex: 1; display: flex; align-items: center; gap: 8px; }
   .sb-label { font-size: 10px; color: var(--text3); }
-  .sb-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    color: var(--text);
-    font-size: 11px;
-    outline: none;
-  }
+  .sb-input { flex: 1; background: transparent; border: none; color: var(--text); font-size: 11px; outline: none; }
   .sb-input::placeholder { color: var(--text3); }
 
-  /* Capture button */
   .btn-capture {
     display: flex;
     align-items: center;
@@ -443,13 +333,9 @@
     font-size: 11px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
   }
   .btn-capture:hover { opacity: 0.85; }
-  .btn-capture.capturing {
-    background: var(--red-bg);
-    color: var(--red-text);
-  }
+  .btn-capture.capturing { background: var(--red-bg); color: var(--red-text); }
 
   /* Modal */
   #modal-overlay {
@@ -466,44 +352,24 @@
   #modal-overlay.hidden { display: none; }
   #modal {
     width: 100%;
-    max-width: 420px;
+    max-width: 440px;
     max-height: 90vh;
     overflow-y: auto;
     background: var(--bg);
     border-radius: var(--radius-lg);
     border: 0.5px solid var(--border);
   }
-  .modal-stripe {
-    height: 3px;
-    background: linear-gradient(90deg, var(--teal), var(--blue), var(--teal));
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  }
-  .modal-body {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-  }
+  .modal-stripe { height: 3px; background: linear-gradient(90deg, var(--teal), var(--blue), var(--teal)); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  .modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
   .modal-h { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
   .modal-title { font-size: 18px; font-weight: 600; }
   .modal-title span { color: var(--teal); }
   .modal-tagline { font-size: 11px; color: var(--text3); }
 
-  .modal-section { }
-  .modal-section-label {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--text3);
-    margin-bottom: 6px;
-  }
+  .modal-section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
 
   .mfield { display: flex; flex-direction: column; gap: 4px; }
-  .mfield label {
-    font-size: 10px;
-    color: var(--text2);
-  }
+  .mfield label { font-size: 10px; color: var(--text2); }
   .mfield input, .mfield select {
     width: 100%;
     border: 0.5px solid var(--border);
@@ -514,7 +380,7 @@
     background: var(--bg);
     outline: none;
   }
-  .mfield input:focus, .mfield select:focus { border-color: var(--border2); }
+  .mfield input:focus { border-color: var(--border2); }
 
   .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
@@ -535,7 +401,9 @@
     border-radius: var(--radius);
     background: var(--bg);
     border: 0.5px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: var(--text2);
     flex-shrink: 0;
   }
@@ -555,93 +423,32 @@
   .toggle-label-group { display: flex; flex-direction: column; gap: 1px; }
   .toggle-label-group strong { font-size: 12px; font-weight: 500; }
   .toggle-label-group span { font-size: 10px; color: var(--text3); }
-  .toggle {
-    width: 36px; height: 20px;
-    background: var(--bg3);
-    border: 0.5px solid var(--border2);
-    border-radius: 10px;
-    position: relative;
-    cursor: pointer;
-  }
-  .toggle::after {
-    content: '';
-    position: absolute;
-    top: 2px; left: 2px;
-    width: 14px; height: 14px;
-    background: white;
-    border-radius: 50%;
-    transition: left 0.2s;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  }
+  .toggle { width: 36px; height: 20px; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: 10px; position: relative; cursor: pointer; }
+  .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
   .toggle.on { background: var(--teal); border-color: var(--teal); }
   .toggle.on::after { left: 18px; }
 
   .pill-group { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
   .pill-sublabel { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text3); margin-bottom: 5px; }
-  .pill {
-    font-size: 11px;
-    padding: 5px 12px;
-    border-radius: 20px;
-    border: 0.5px solid var(--border2);
-    color: var(--text2);
-    cursor: pointer;
-    background: var(--bg);
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
+  .pill { font-size: 11px; padding: 5px 12px; border-radius: 20px; border: 0.5px solid var(--border2); color: var(--text2); cursor: pointer; background: var(--bg); transition: all 0.15s; white-space: nowrap; }
   .pill:hover { background: var(--bg2); }
-  .pill.active {
-    background: var(--blue-bg);
-    color: var(--blue-text);
-    border-color: transparent;
-  }
+  .pill.active { background: var(--blue-bg); color: var(--blue-text); border-color: transparent; }
 
   .model-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-  .model-card {
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius);
-    padding: 10px 12px;
-    cursor: pointer;
-    background: var(--bg);
-    transition: all 0.15s;
-  }
+  .model-card { border: 0.5px solid var(--border); border-radius: var(--radius); padding: 10px 12px; cursor: pointer; background: var(--bg); transition: all 0.15s; }
   .model-card:hover { background: var(--bg2); }
-  .model-card.active {
-    border-color: var(--blue);
-    background: var(--blue-bg);
-  }
+  .model-card.active { border-color: var(--blue); background: var(--blue-bg); }
   .model-card .name { font-size: 11px; font-weight: 500; }
   .model-card .tag { font-size: 9px; color: var(--text3); margin-top: 2px; }
 
-  .src-pill {
-    flex: 1;
-    text-align: center;
-    padding: 8px 0;
-    font-size: 11px;
-    cursor: pointer;
-    color: var(--text2);
-    transition: all 0.15s;
-    border: 0.5px solid var(--border);
-  }
-  .src-pill:first-child { border-radius: var(--radius) 0 0 var(--radius); }
-  .src-pill:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
-  .src-pill.active { background: var(--blue-bg); color: var(--blue-text); }
+  .audio-src-grid { display: flex; border: 0.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .src-pill-grid { flex: 1; text-align: center; padding: 8px 0; font-size: 11px; cursor: pointer; color: var(--text2); border-right: 0.5px solid var(--border); }
+  .src-pill-grid:last-child { border-right: none; }
+  .src-pill-grid.active { background: var(--blue-bg); color: var(--blue-text); }
 
-  .btn-launch {
-    width: 100%;
-    padding: 13px;
-    border-radius: var(--radius-lg);
-    background: var(--text);
-    color: var(--bg);
-    font-size: 13px;
-    font-weight: 500;
-    border: none;
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
+  .btn-launch { width: 100%; padding: 13px; border-radius: var(--radius-lg); background: var(--text); color: var(--bg); font-size: 13px; font-weight: 500; border: none; cursor: pointer; }
   .btn-launch:hover { opacity: 0.85; }
 
-  /* Toast */
   #toast {
     position: fixed;
     bottom: 48px;
@@ -660,7 +467,7 @@
     box-shadow: 0 4px 16px rgba(0,0,0,0.15);
   }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
-  #toast.ok { color: var(--teal); border-color: var(--teal); }
+  #toast.ok { color: var(--teal-text); border-color: var(--teal); }
   #toast.err { color: var(--red-text); border-color: var(--red); }
 </style>
 </head>
@@ -671,132 +478,113 @@
   <div id="modal">
     <div class="modal-stripe"></div>
     <div class="modal-body">
-
       <div class="modal-h">
         <div>
           <div class="modal-title">Interview <span>Copilot</span></div>
-          <div class="modal-tagline">Stealth interview assistant</div>
+          <div class="modal-tagline">Stealth AI interview assistant</div>
         </div>
-        <div class="badge badge-stealth">STEALTH MODE</div>
+        <div class="badge badge-stealth">STEALTH</div>
       </div>
 
-      <!-- Resume -->
-      <div class="modal-section">
-        <div class="modal-section-label">Resume</div>
-        <div class="upload-zone" onclick="document.getElementById('resume-file-input').click()">
-          <div class="upload-icon">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 5l3-3 3 3M3 12h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-          <div class="upload-text">
-            <strong id="resume-filename">Upload Resume</strong>
-            <span>PDF or DOCX</span>
-          </div>
-          <input type="file" id="resume-file-input" accept=".pdf,.docx" style="display:none"/>
+      <div class="modal-section-label">Resume</div>
+      <div class="upload-zone" onclick="document.getElementById('resume-file-input').click()">
+        <div class="upload-icon">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 5l3-3 3 3M3 12h10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
-        <div id="resume-upload-status" style="font-size:10px;color:var(--text3);display:none;"></div>
-      </div>
-
-      <!-- Job Description -->
-      <div class="modal-section">
-        <div class="modal-section-label">Job Description</div>
-        <textarea id="inp-job-desc" rows="3" placeholder="Paste job description..." style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:9px 11px;font-size:12px;color:var(--text);resize:none;line-height:1.5;"></textarea>
-      </div>
-
-      <!-- Session Setup -->
-      <div class="modal-section">
-        <div class="modal-section-label">Session Setup</div>
-        <div class="grid2" style="margin-bottom:10px;">
-          <div class="mfield">
-            <label>Role</label>
-            <select id="inp-role-select">
-              <option value="Software Engineer">Software Engineer</option>
-              <option value="Product Manager">Product Manager</option>
-              <option value="Data Scientist">Data Scientist</option>
-              <option value="UX Designer">UX Designer</option>
-              <option value="Engineering Manager">Engineering Manager</option>
-              <option value="DevOps Engineer">DevOps Engineer</option>
-              <option value="custom">Custom...</option>
-            </select>
-          </div>
-          <div class="mfield">
-            <label>Language</label>
-            <select id="inp-language">
-              <option value="en-US">English</option>
-              <option value="es-ES">Spanish</option>
-              <option value="fr-FR">French</option>
-              <option value="hi-IN">Hindi</option>
-              <option value="de-DE">German</option>
-              <option value="pt-BR">Portuguese</option>
-              <option value="zh-CN">Mandarin</option>
-            </select>
-          </div>
+        <div class="upload-text">
+          <strong id="resume-filename">Upload Resume</strong>
+          <span>PDF or DOCX</span>
         </div>
-        <div class="mfield" id="role-custom-wrap" style="display:none;">
-          <label>Custom Role</label>
-          <input type="text" id="inp-role" placeholder="e.g. Senior Backend Engineer"/>
+        <input type="file" id="resume-file-input" accept=".pdf,.docx" style="display:none"/>
+      </div>
+      <div id="resume-upload-status" style="font-size:10px;color:var(--text3);display:none;"></div>
+
+      <div class="modal-section-label">Job Description</div>
+      <textarea id="inp-job-desc" rows="3" placeholder="Paste job description..." style="width:100%;background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:9px 11px;font-size:12px;color:var(--text);resize:none;line-height:1.5;"></textarea>
+
+      <div class="modal-section-label">Session</div>
+      <div class="grid2" style="margin-bottom:10px;">
+        <div class="mfield">
+          <label>Role</label>
+          <select id="inp-role-select">
+            <option value="Software Engineer">Software Engineer</option>
+            <option value="Product Manager">Product Manager</option>
+            <option value="Data Scientist">Data Scientist</option>
+            <option value="UX Designer">UX Designer</option>
+            <option value="Engineering Manager">Engineering Manager</option>
+            <option value="DevOps Engineer">DevOps Engineer</option>
+            <option value="custom">Custom...</option>
+          </select>
+        </div>
+        <div class="mfield">
+          <label>Language</label>
+          <select id="inp-language">
+            <option value="en-US">English</option>
+            <option value="es-ES">Spanish</option>
+            <option value="fr-FR">French</option>
+            <option value="hi-IN">Hindi</option>
+            <option value="de-DE">German</option>
+            <option value="pt-BR">Portuguese</option>
+            <option value="zh-CN">Mandarin</option>
+          </select>
         </div>
       </div>
-
-      <!-- AI Model -->
-      <div class="modal-section">
-        <div class="modal-section-label">AI Model</div>
-        <div class="model-grid">
-          <div class="model-card active" data-llm="ollama" data-model="llama3.2" onclick="selectModelCard(this)">
-            <div class="name">Llama 3.2</div>
-            <div class="tag">Local · Free</div>
-          </div>
-          <div class="model-card" data-llm="ollama" data-model="mistral" onclick="selectModelCard(this)">
-            <div class="name">Mistral</div>
-            <div class="tag">Fast · Local</div>
-          </div>
-          <div class="model-card" data-llm="openai" data-model="gpt-4o" onclick="selectModelCard(this)">
-            <div class="name">GPT-4o</div>
-            <div class="tag">Cloud · Best</div>
-          </div>
-        </div>
-        <div class="mfield" id="f-ollama-url" style="margin-top:10px;">
-          <label>Ollama URL</label>
-          <input type="text" id="inp-ollama" value="http://localhost:11434"/>
-        </div>
-        <div class="mfield" id="f-api-fields" style="display:none;margin-top:10px;">
-          <label>API Key</label>
-          <input type="password" id="inp-api-key" placeholder="sk-..."/>
-        </div>
+      <div class="mfield" id="role-custom-wrap" style="display:none;">
+        <label>Custom Role</label>
+        <input type="text" id="inp-role" placeholder="e.g. Senior Backend Engineer"/>
       </div>
 
-      <!-- Answer Settings -->
-      <div class="modal-section">
-        <div class="modal-section-label">Answer Settings</div>
-        <div class="toggle-row">
-          <div class="toggle-label-group">
-            <strong>Thinking Mode</strong>
-            <span>Deep reasoning</span>
-          </div>
-          <div class="toggle" id="toggle-thinking" onclick="this.classList.toggle('on')"></div>
+      <div class="modal-section-label">AI Model</div>
+      <div class="model-grid">
+        <div class="model-card active" data-llm="ollama" data-model="llama3.2" onclick="selectModelCard(this)">
+          <div class="name">Llama 3.2</div>
+          <div class="tag">Local · Free</div>
         </div>
-        <div class="pill-sublabel">Answer Length</div>
-        <div class="pill-group" id="length-pills">
-          <div class="pill" data-group="length" onclick="selectPill(this)">Short</div>
-          <div class="pill active" data-group="length" onclick="selectPill(this)">Paragraph</div>
-          <div class="pill" data-group="length" onclick="selectPill(this)">Bullet Points</div>
-          <div class="pill" data-group="length" onclick="selectPill(this)">Elaborated</div>
+        <div class="model-card" data-llm="ollama" data-model="mistral" onclick="selectModelCard(this)">
+          <div class="name">Mistral</div>
+          <div class="tag">Fast · Local</div>
         </div>
-        <div class="pill-sublabel">Tone</div>
-        <div class="pill-group" id="tone-pills">
-          <div class="pill active" data-group="tone" onclick="selectPill(this)">Professional</div>
-          <div class="pill" data-group="tone" onclick="selectPill(this)">Assertive</div>
-          <div class="pill" data-group="tone" onclick="selectPill(this)">Friendly</div>
+        <div class="model-card" data-llm="openai" data-model="gpt-4o" onclick="selectModelCard(this)">
+          <div class="name">GPT-4o</div>
+          <div class="tag">Cloud · Best</div>
         </div>
       </div>
+      <div class="mfield" id="f-ollama-url" style="margin-top:10px;">
+        <label>Ollama URL</label>
+        <input type="text" id="inp-ollama" value="http://localhost:11434"/>
+      </div>
+      <div class="mfield" id="f-api-fields" style="display:none;margin-top:10px;">
+        <label>API Key</label>
+        <input type="password" id="inp-api-key" placeholder="sk-..."/>
+      </div>
 
-      <!-- Audio Source -->
-      <div class="modal-section">
-        <div class="modal-section-label">Audio Source</div>
-        <div style="display:flex;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-          <div class="src-pill active" data-mode="tab" onclick="selectSrcMode(this)">Tab Audio</div>
-          <div class="src-pill" data-mode="mic" onclick="selectSrcMode(this)">Microphone</div>
-          <div class="src-pill" data-mode="both" onclick="selectSrcMode(this)">Both</div>
+      <div class="modal-section-label">Answer Settings</div>
+      <div class="toggle-row">
+        <div class="toggle-label-group">
+          <strong>Thinking Mode</strong>
+          <span>Deep reasoning</span>
         </div>
+        <div class="toggle" id="toggle-thinking" onclick="this.classList.toggle('on')"></div>
+      </div>
+      <div class="pill-sublabel">Length</div>
+      <div class="pill-group" id="length-pills">
+        <div class="pill" data-group="length" onclick="selectPill(this)">Short</div>
+        <div class="pill active" data-group="length" onclick="selectPill(this)">Paragraph</div>
+        <div class="pill" data-group="length" onclick="selectPill(this)">Bullet Points</div>
+        <div class="pill" data-group="length" onclick="selectPill(this)">Elaborated</div>
+      </div>
+      <div class="pill-sublabel">Tone</div>
+      <div class="pill-group" id="tone-pills">
+        <div class="pill active" data-group="tone" onclick="selectPill(this)">Professional</div>
+        <div class="pill" data-group="tone" onclick="selectPill(this)">Assertive</div>
+        <div class="pill" data-group="tone" onclick="selectPill(this)">Friendly</div>
+      </div>
+
+      <div class="modal-section-label">Audio Source</div>
+      <div class="audio-src-grid">
+        <div class="src-pill-grid active" data-mode="tab" onclick="selectSrcMode(this)">Tab Audio</div>
+        <div class="src-pill-grid" data-mode="mic" onclick="selectSrcMode(this)">Microphone</div>
+        <div class="src-pill-grid" data-mode="both" onclick="selectSrcMode(this)">Both</div>
       </div>
 
       <button class="btn-launch" id="btn-launch">Start Interview</button>
@@ -820,24 +608,23 @@
   </div>
 </div>
 
-<!-- PLATFORM SELECTOR -->
+<!-- PLATFORM -->
 <div class="platform-row">
-  <button class="platform-btn active" data-p="teams">Teams</button>
-  <button class="platform-btn" data-p="zoom">Zoom</button>
-  <button class="platform-btn" data-p="meet">Meet</button>
-  <button class="platform-btn" data-p="other">Other</button>
+  <button class="platform-btn active" data-p="teams" onclick="selectPlatform(this)">Teams</button>
+  <button class="platform-btn" data-p="zoom" onclick="selectPlatform(this)">Zoom</button>
+  <button class="platform-btn" data-p="meet" onclick="selectPlatform(this)">Meet</button>
+  <button class="platform-btn" data-p="other" onclick="selectPlatform(this)">Other</button>
 </div>
 
 <!-- WORKSPACE -->
 <div class="workspace">
-
-  <!-- LEFT: TRANSCRIPT -->
   <div class="panel" id="panel-left">
     <div class="panel-header">
       <div class="panel-title">Live Transcript</div>
       <div class="panel-meta">
         <span id="tx-count" style="font-size:10px;color:var(--text3)">0 segments</span>
         <button class="btn-icon" onclick="copyTranscript()">Copy</button>
+        <button class="btn-icon" onclick="clearTranscript()">Clear</button>
       </div>
     </div>
     <div class="visualizer">
@@ -860,12 +647,13 @@
     </div>
   </div>
 
-  <!-- RIGHT: ANSWERS -->
   <div class="panel" id="panel-right">
     <div class="panel-header">
       <div class="panel-title">AI Answers</div>
       <div class="panel-meta">
         <span id="ans-count" style="font-size:10px;color:var(--text3)">0 answers</span>
+        <button class="btn-icon" onclick="copyLastAnswer()">Copy</button>
+        <button class="btn-icon" onclick="clearAnswers()">Clear</button>
       </div>
     </div>
     <div class="q-detector">
@@ -897,7 +685,6 @@
   </div>
 </div>
 
-<!-- TOAST -->
 <div id="toast"></div>
 
 <script>
@@ -907,6 +694,8 @@ const CFG = {
   llm: 'ollama',
   ollamaUrl: 'http://localhost:11434',
   model: 'llama3.2',
+  apiUrl: '',
+  apiKey: '',
   role: '',
   sourceMode: 'tab',
   platform: 'teams',
@@ -922,10 +711,14 @@ const CFG = {
 
 const ST = {
   capturing: false,
+  generating: false,
   sessionStart: null,
   segCount: 0,
   ansCount: 0,
   history: [],
+  pendingQuestion: '',
+  abortCtrl: null,
+  liveEl: null,
   accumulated: '',
   silenceTimer: null,
   audioCtx: null,
@@ -934,9 +727,15 @@ const ST = {
   micStream: null,
   recognition: null,
   rafId: null,
+  waveHistory: new Array(80).fill(0),
   wsUi: null,
   wsAudio: null,
-  waveHistory: new Array(80).fill(0)
+  wsReconnectDelay: 1000,
+  wsReconnectTimer: null,
+  resumeIndexed: false,
+  _audioProcessor: null,
+  _copilotCard: null,
+  _backendLiveNodes: {}
 };
 
 function selectModelCard(el) {
@@ -958,24 +757,50 @@ function selectPill(el) {
 }
 
 function selectSrcMode(el) {
-  document.querySelectorAll('.src-pill').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.src-pill-grid').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
   CFG.sourceMode = el.dataset.mode;
+}
+
+function selectPlatform(el) {
+  document.querySelectorAll('.platform-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  CFG.platform = el.dataset.p;
 }
 
 document.getElementById('inp-role-select').addEventListener('change', function() {
   document.getElementById('role-custom-wrap').style.display = this.value === 'custom' ? '' : 'none';
 });
 
-document.getElementById('resume-file-input').addEventListener('change', function() {
+document.getElementById('resume-file-input').addEventListener('change', async function() {
   if (!this.files.length) return;
-  document.getElementById('resume-filename').textContent = this.files[0].name;
-  document.getElementById('resume-upload-status').style.display = 'block';
-  document.getElementById('resume-upload-status').textContent = 'Upload ready';
+  const file = this.files[0];
+  const backendUrlInput = document.getElementById('inp-backend-url');
+  const backendUrl = (backendUrlInput?.value || 'http://localhost:8001').trim().replace(/\/$/, '');
+  document.getElementById('resume-filename').textContent = file.name;
+  const statusEl = document.getElementById('resume-upload-status');
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Indexing into RAG…';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch(`${backendUrl}/api/index-context`, { method: 'POST', body: fd });
+    if (resp.ok) {
+      statusEl.textContent = '✓ Resume indexed';
+      statusEl.style.color = 'var(--teal)';
+      ST.resumeIndexed = true;
+    } else {
+      throw new Error('Server error');
+    }
+  } catch (e) {
+    statusEl.textContent = '⚠ Backend offline';
+    statusEl.style.color = 'var(--amber)';
+  }
 });
 
 document.getElementById('btn-launch').addEventListener('click', () => {
   CFG.ollamaUrl = document.getElementById('inp-ollama').value.trim() || 'http://localhost:11434';
+  CFG.apiKey = document.getElementById('inp-api-key')?.value.trim() || '';
   CFG.language = document.getElementById('inp-language').value;
   CFG.jobDesc = document.getElementById('inp-job-desc').value.trim();
   CFG.thinkingMode = document.getElementById('toggle-thinking').classList.contains('on');
@@ -989,11 +814,85 @@ document.getElementById('btn-launch').addEventListener('click', () => {
 function onLaunched() {
   ST.sessionStart = Date.now();
   startSessionTimer();
+  initVisualizer();
   document.getElementById('sb-context-input').value = CFG.role;
   document.getElementById('sb-src').textContent = CFG.sourceMode.toUpperCase();
-  if (CFG.stealthMode) document.getElementById('badge-stealth').style.display = 'none';
+  document.getElementById('badge-stealth').style.display = 'none';
   document.getElementById('badge-live').classList.add('show');
-  toast('Ready', 'ok');
+  connectBackendWS();
+  toast('Copilot ready', 'ok');
+}
+
+function connectBackendWS() {
+  const wsUrl = CFG.backendUrl.replace('http', 'ws') + '/ws/ui';
+  try {
+    const ws = new WebSocket(wsUrl);
+    ws.onopen = () => {
+      ST.wsReconnectDelay = 1000;
+      toast('Backend connected', 'ok');
+      CFG.useBackend = true;
+    };
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'transcript') handleBackendTranscript(msg);
+        else if (msg.type === 'copilot_partial' || msg.type === 'copilot_final') handleBackendCopilot(msg);
+        else if (msg.type === 'heartbeat') ws.send(JSON.stringify({ type: 'pong' }));
+      } catch(e) {}
+    };
+    ws.onclose = () => {
+      CFG.useBackend = false;
+      clearTimeout(ST.wsReconnectTimer);
+      ST.wsReconnectTimer = setTimeout(() => {
+        ST.wsReconnectDelay = Math.min(ST.wsReconnectDelay * 1.5, 15000);
+        connectBackendWS();
+      }, ST.wsReconnectDelay);
+    };
+    ws.onerror = () => ws.close();
+    ST.wsUi = ws;
+  } catch(e) {
+    CFG.useBackend = false;
+  }
+}
+
+function handleBackendTranscript(msg) {
+  const uid = msg.utterance_id || msg.id || Date.now().toString();
+  if (!msg.is_final) {
+    if (!ST._backendLiveNodes) ST._backendLiveNodes = {};
+    if (!ST._backendLiveNodes[uid]) {
+      ST._backendLiveNodes[uid] = addTxEntry(msg.text, 'live', msg.speaker || 'YOU');
+    } else {
+      const b = ST._backendLiveNodes[uid].querySelector('.tx-bubble');
+      if (b) b.innerHTML = esc(msg.text) + '<span class="blink-cursor"></span>';
+    }
+  } else {
+    if (ST._backendLiveNodes && ST._backendLiveNodes[uid]) {
+      const el = ST._backendLiveNodes[uid];
+      const b = el.querySelector('.tx-bubble');
+      const t = el.querySelector('.tx-type');
+      if (b) b.textContent = msg.text;
+      if (t) { t.textContent = 'FINAL'; t.className = 'tx-type final'; }
+      delete ST._backendLiveNodes[uid];
+    } else {
+      addTxEntry(msg.text, 'final', msg.speaker || 'YOU');
+    }
+    detectQuestion(msg.text);
+  }
+}
+
+function handleBackendCopilot(msg) {
+  removeEmpty('ans');
+  if (!ST._copilotCard) {
+    ST._copilotCard = createAnswerCard('AI Assistant');
+  }
+  if (msg.type === 'copilot_partial') {
+    streamCard(ST._copilotCard, msg.text || '');
+  } else if (msg.type === 'copilot_final') {
+    finalizeCard(ST._copilotCard, msg.text, 0, msg.text.includes('error') ? 'err' : 'done');
+    ST._copilotCard = null;
+    ST.ansCount++;
+    updateAnswerCounts();
+  }
 }
 
 function startSessionTimer() {
@@ -1004,23 +903,136 @@ function startSessionTimer() {
   }, 1000);
 }
 
-// Platform buttons
-document.querySelectorAll('.platform-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.platform-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    CFG.platform = btn.dataset.p;
-  });
-});
+function initVisualizer() {
+  const canvas = document.getElementById('vis-canvas');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.offsetWidth * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ST._visCtx = ctx;
+  ST._visW = canvas.offsetWidth;
+  ST._visH = canvas.offsetHeight;
+  drawIdleWave();
+}
 
-// Capture button
-document.getElementById('btn-capture').addEventListener('click', async () => {
-  if (ST.capturing) {
-    stopCapture();
-  } else {
-    await startCapture();
+function drawIdleWave() {
+  cancelAnimationFrame(ST.rafId);
+  const ctx = ST._visCtx, W = ST._visW, H = ST._visH;
+  let t = 0;
+  function frame() {
+    ctx.clearRect(0,0,W,H);
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(100,100,100,0.3)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x++) {
+      const y = H/2 + Math.sin((x/W)*Math.PI*4 + t)*2;
+      x === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    t += 0.04;
+    ST.rafId = requestAnimationFrame(frame);
   }
-});
+  frame();
+}
+
+function drawLiveWave(analyser) {
+  cancelAnimationFrame(ST.rafId);
+  const ctx = ST._visCtx, W = ST._visW, H = ST._visH;
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  function frame() {
+    analyser.getByteTimeDomainData(data);
+    const rms = Math.sqrt(data.reduce((s,v)=>s+((v-128)/128)**2,0)/data.length);
+    const level = Math.min(rms * 5, 1);
+    const db = level > 0 ? Math.round(20 * Math.log10(level + 0.001)) : -60;
+    ST.waveHistory.shift();
+    ST.waveHistory.push(level);
+    document.getElementById('vis-level-text').textContent = `${db} dB`;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = 'rgba(80,80,80,0.2)';
+    ST.waveHistory.forEach((v,i) => {
+      const bw = (W/ST.waveHistory.length) - 1;
+      const bh = Math.max(1, v * H);
+      ctx.fillRect(i*(bw+1), (H-bh)/2, bw, bh);
+    });
+    ST.rafId = requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+async function startCapture() {
+  setBtnCapture(true);
+  ST.capturing = true;
+  removeEmpty('tx');
+  const mode = CFG.sourceMode;
+  try {
+    if (mode === 'tab' || mode === 'both') await startTabCapture();
+    if (mode === 'mic' || mode === 'both') await startMicCapture();
+  } catch (e) {
+    console.error('Capture error:', e);
+    toast('Capture failed: ' + e.message, 'err');
+    stopCapture();
+    return;
+  }
+  document.getElementById('vis-source-label').textContent = mode === 'tab' ? 'Tab Audio' : mode === 'mic' ? 'Mic' : 'Both';
+  setChip('stt', 'live');
+  if (!CFG.useBackend) {
+    startSpeechRecognition();
+  } else {
+    connectAudioWS();
+    setupAudioToBackend();
+  }
+  toast('Capture started', 'ok');
+}
+
+async function startTabCapture() {
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: { width: 1, height: 1, frameRate: 1 },
+    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 16000 }
+  });
+  ST.tabStream = stream;
+  stream.getVideoTracks().forEach(t => t.stop());
+  const audioTracks = stream.getAudioTracks();
+  if (!audioTracks.length) throw new Error('No audio track');
+  setupAudioAnalyser(stream);
+  stream.getAudioTracks()[0].addEventListener('ended', () => {
+    if (ST.capturing) { toast('Tab sharing stopped', 'err'); stopCapture(); }
+  });
+}
+
+async function startMicCapture() {
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 16000 }
+  });
+  ST.micStream = stream;
+  if (!ST.audioCtx) setupAudioAnalyser(stream);
+}
+
+function setupAudioAnalyser(stream) {
+  ST.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  const source = ST.audioCtx.createMediaStreamSource(stream);
+  ST.analyser = ST.audioCtx.createAnalyser();
+  ST.analyser.fftSize = 512;
+  source.connect(ST.analyser);
+  drawLiveWave(ST.analyser);
+}
+
+function stopCapture() {
+  ST.capturing = false;
+  setBtnCapture(false);
+  setChip('stt', 'idle');
+  if (ST.recognition) { try { ST.recognition.stop(); } catch(e){} ST.recognition = null; }
+  if (ST.tabStream) { ST.tabStream.getTracks().forEach(t=>t.stop()); ST.tabStream = null; }
+  if (ST.micStream) { ST.micStream.getTracks().forEach(t=>t.stop()); ST.micStream = null; }
+  if (ST._audioProcessor) { ST._audioProcessor.disconnect ? ST._audioProcessor.disconnect() : ST._audioProcessor.node?.disconnect(); ST._audioProcessor = null; }
+  if (ST.audioCtx) { ST.audioCtx.close(); ST.audioCtx = null; ST.analyser = null; }
+  if (ST.wsAudio) { ST.wsAudio.close(); ST.wsAudio = null; }
+  clearTimeout(ST.silenceTimer);
+  document.getElementById('vis-source-label').textContent = 'No audio';
+  document.getElementById('vis-level-text').textContent = '0 dB';
+  drawIdleWave();
+  toast('Capture stopped', 'ok');
+}
 
 function setBtnCapture(capturing) {
   const btn = document.getElementById('btn-capture');
@@ -1029,37 +1041,312 @@ function setBtnCapture(capturing) {
   btn.classList.toggle('capturing', capturing);
 }
 
-async function startCapture() {
-  setBtnCapture(true);
-  ST.capturing = true;
-  document.getElementById('vis-source-label').textContent = CFG.sourceMode === 'tab' ? 'Tab Audio' : CFG.sourceMode === 'mic' ? 'Mic' : 'Both';
-  document.getElementById('badge-live').classList.add('show');
-  toast('Capture started', 'ok');
+function setChip(id, state) {
+  const chip = document.getElementById('chip-' + id) || document.getElementById('badge-live');
+  if (!chip) return;
+  chip.className = 'badge badge-' + state;
+  if (state === 'live') chip.classList.add('show');
 }
 
-function stopCapture() {
-  ST.capturing = false;
-  setBtnCapture(false);
-  document.getElementById('vis-source-label').textContent = 'No audio';
-  document.getElementById('vis-level-text').textContent = '0 dB';
-  toast('Capture stopped', 'ok');
+function startSpeechRecognition() {
+  const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SRClass) { toast('Web Speech API not available', 'err'); return; }
+  const rec = new SRClass();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = CFG.language || 'en-US';
+  rec.maxAlternatives = 1;
+  ST.recognition = rec;
+  ST.accumulated = '';
+  rec.onresult = (evt) => {
+    let interim = '', finalChunk = '';
+    for (let i = evt.resultIndex; i < evt.results.length; i++) {
+      const chunk = evt.results[i];
+      if (chunk.isFinal) finalChunk += chunk[0].transcript;
+      else interim += chunk[0].transcript;
+    }
+    if (interim) {
+      if (!ST.liveEl) ST.liveEl = addTxEntry(interim, 'live', 'YOU');
+      else ST.liveEl.querySelector('.tx-bubble').innerHTML = esc(interim) + '<span class="blink-cursor"></span>';
+    }
+    if (finalChunk) {
+      if (ST.liveEl) {
+        ST.liveEl.querySelector('.tx-bubble').textContent = finalChunk;
+        ST.liveEl.querySelector('.tx-type').textContent = 'FINAL';
+        ST.liveEl.querySelector('.tx-type').className = 'tx-type final';
+        ST.liveEl = null;
+      } else {
+        addTxEntry(finalChunk, 'final', 'YOU');
+      }
+      ST.accumulated += ' ' + finalChunk;
+      detectQuestion(finalChunk);
+    }
+  };
+  rec.onend = () => { if (ST.capturing) rec.start(); };
+  rec.start();
 }
 
-// Toast
+function addTxEntry(text, type, speaker) {
+  removeEmpty('tx');
+  const body = document.getElementById('tx-body');
+  const entry = document.createElement('div');
+  entry.className = 'tx-entry';
+  entry.innerHTML = `<div class="tx-meta"><span class="tx-who ${speaker === 'YOU' ? '' : 'them'}">${speaker}</span><span class="tx-ts">${new Date().toLocaleTimeString()}</span><span class="tx-type ${type}">${type.toUpperCase()}</span></div><div class="tx-bubble ${type}">${esc(text)}</div>`;
+  body.appendChild(entry);
+  body.scrollTop = body.scrollHeight;
+  ST.segCount++;
+  document.getElementById('sb-segs').textContent = ST.segCount;
+  document.getElementById('tx-count').textContent = `${ST.segCount} segments`;
+  return entry;
+}
+
+function removeEmpty(panel) {
+  const empty = document.getElementById(panel + '-empty');
+  if (empty) empty.remove();
+}
+
+function detectQuestion(text) {
+  const qText = document.getElementById('q-text');
+  const qBtn = document.getElementById('q-gen-btn');
+  const qWords = /^(tell me|can you|could you|what|how|why|describe|explain|walk me|have you|do you|would you|list|give me)/i;
+  if (qWords.test(text) || text.includes('?')) {
+    qText.textContent = text;
+    qText.classList.add('detected');
+    qBtn.classList.add('show');
+    ST.pendingQuestion = text;
+  } else {
+    qText.textContent = 'Listening...';
+    qText.classList.remove('detected');
+    qBtn.classList.remove('show');
+  }
+}
+
+function generateFromDetected() {
+  if (ST.pendingQuestion) {
+    generateAnswer(ST.pendingQuestion);
+  }
+}
+
+let cardNum = 0;
+function createAnswerCard(question) {
+  removeEmpty('ans');
+  cardNum++;
+  const body = document.getElementById('ans-body');
+  const card = document.createElement('div');
+  card.className = 'answer-card';
+  card.innerHTML = `<div class="ac-head"><span class="ac-num">${cardNum}</span><span class="ac-question">${esc(question.slice(0,100))}</span><span class="ac-badge stream">streaming</span></div><div class="ac-body"></div><div class="ac-footer"><span class="ac-timing">0.0s</span><button class="btn-icon" onclick="navigator.clipboard.writeText(this.parentElement.previousElementSibling.textContent)">Copy</button></div>`;
+  body.appendChild(card);
+  body.scrollTop = body.scrollHeight;
+  ST.generating = true;
+  setChip('llm', 'proc');
+  return card;
+}
+
+function streamCard(card, text) {
+  card.querySelector('.ac-body').textContent = text;
+}
+
+function finalizeCard(card, text, elapsed, status) {
+  card.querySelector('.ac-body').textContent = text;
+  card.querySelector('.ac-badge').textContent = status === 'err' ? 'error' : 'done';
+  card.querySelector('.ac-badge').className = 'ac-badge ' + status;
+  card.querySelector('.ac-timing').textContent = elapsed + 's';
+  ST.generating = false;
+  setChip('llm', 'idle');
+  ST.ansCount++;
+  updateAnswerCounts();
+  ST.history.push({ role: 'user', text: card.querySelector('.ac-question').textContent });
+  ST.history.push({ role: 'assistant', text: text });
+  if (ST.history.length > 16) ST.history = ST.history.slice(-16);
+}
+
+function updateAnswerCounts() {
+  document.getElementById('sb-ans').textContent = ST.ansCount;
+  document.getElementById('ans-count').textContent = `${ST.ansCount} answers`;
+}
+
+async function generateAnswer(question) {
+  if (CFG.useBackend) {
+    setChip('llm', 'proc');
+    return;
+  }
+  if (ST.abortCtrl) ST.abortCtrl.abort();
+  ST.generating = true;
+  setChip('llm', 'proc');
+  removeEmpty('ans');
+  const context = document.getElementById('sb-context-input').value.trim() || CFG.role || '';
+  const sysPrompt = buildSystemPrompt(context);
+  const histMsgs = ST.history.slice(-8).map(h => ({ role: h.role === 'user' ? 'user' : 'assistant', content: h.text }));
+  const messages = [{ role: 'system', content: sysPrompt }, ...histMsgs];
+  const card = createAnswerCard(question);
+  const t0 = Date.now();
+  ST.abortCtrl = new AbortController();
+  try {
+    const full = await streamOllama(messages, card);
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    finalizeCard(card, full, elapsed, 'done');
+  } catch (e) {
+    finalizeCard(card, 'Error: ' + e.message, 0, 'err');
+  }
+}
+
+function buildSystemPrompt(context) {
+  const parts = [
+    'You are an interview copilot. Provide helpful, concise answers.',
+    context && `Context: ${context}`,
+    CFG.jobDesc && `Job Description: ${CFG.jobDesc}`,
+    CFG.thinkingMode && 'Use deep reasoning.',
+    `Answer length: ${CFG.answerLength}`,
+    `Tone: ${CFG.answerTone}`
+  ].filter(Boolean);
+  return parts.join('\n');
+}
+
+function anySignal(signals) {
+  const ctrl = new AbortController();
+  for (const sig of signals) {
+    if (sig.aborted) { ctrl.abort(); break; }
+    sig.addEventListener('abort', () => ctrl.abort(), { once: true });
+  }
+  return ctrl.signal;
+}
+
+async function streamOllama(messages, card) {
+  const timeoutCtrl = new AbortController();
+  const timeoutId = setTimeout(() => timeoutCtrl.abort(), 25000);
+  const signal = anySignal([ST.abortCtrl?.signal, timeoutCtrl.signal]);
+  try {
+    const resp = await fetch(`${CFG.ollamaUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: CFG.model, messages, stream: true, options: { temperature: 0.7, num_predict: 600 } }),
+      signal
+    });
+    if (!resp.ok) throw new Error(`Ollama ${resp.status}`);
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let full = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      for (const line of dec.decode(value, { stream: true }).split('\n').filter(Boolean)) {
+        try {
+          const j = JSON.parse(line);
+          if (j.message?.content) { full += j.message.content; streamCard(card, full); }
+          if (j.done) return full;
+        } catch(e) {}
+      }
+    }
+    return full;
+  } catch (e) {
+    if (e.name === 'AbortError') return '[Response timed out]';
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function connectAudioWS() {
+  if (ST.wsAudio && ST.wsAudio.readyState === WebSocket.OPEN) return;
+  const wsUrl = CFG.backendUrl.replace('http', 'ws') + '/ws/audio';
+  try {
+    const ws = new WebSocket(wsUrl);
+    ws.onopen = () => toast('Audio stream connected', 'ok');
+    ws.onclose = () => { ST.wsAudio = null; if (ST.capturing) setTimeout(connectAudioWS, 2000); };
+    ws.onerror = () => ws.close();
+    ST.wsAudio = ws;
+  } catch(e) {}
+}
+
+function sendAudioChunk(audioData) {
+  if (ST.wsAudio && ST.wsAudio.readyState === WebSocket.OPEN) {
+    try { ST.wsAudio.send(audioData); } catch(e) {}
+  }
+}
+
+async function setupAudioToBackend() {
+  if (!ST.audioCtx || !ST.analyser) return;
+  try {
+    const stream = ST.tabStream || ST.micStream;
+    if (!stream) return;
+    const workletCode = `
+      class PCMProcessor extends AudioWorkletProcessor {
+        process(inputs, outputs, parameters) {
+          const input = inputs[0];
+          if (input && input.length > 0) {
+            const channelData = input[0];
+            const pcmData = new Int16Array(channelData.length);
+            for (let i = 0; i < channelData.length; i++) {
+              pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(channelData[i] * 32768)));
+            }
+            this.port.postMessage(pcmData.buffer);
+          }
+          return true;
+        }
+      }
+      registerProcessor('pcm-processor', PCMProcessor);
+    `;
+    const blob = new Blob([workletCode], { type: 'application/javascript' });
+    const workletUrl = URL.createObjectURL(blob);
+    await ST.audioCtx.audioWorklet.addModule(workletUrl);
+    const pcmNode = new AudioWorkletNode(ST.audioCtx, 'pcm-processor');
+    pcmNode.port.onmessage = (e) => {
+      if (ST.capturing && CFG.useBackend) sendAudioChunk(e.data);
+    };
+    const source = ST.audioCtx.createMediaStreamSource(stream);
+    source.connect(pcmNode);
+    pcmNode.connect(ST.audioCtx.destination);
+    ST._audioProcessor = { node: pcmNode, url: workletUrl };
+  } catch (e) {
+    console.warn('AudioWorklet failed:', e);
+  }
+}
+
+function copyTranscript() {
+  const texts = [...document.querySelectorAll('.tx-bubble')].map(e => e.textContent.trim()).join('\n\n');
+  navigator.clipboard.writeText(texts).then(() => toast('Copied', 'ok'));
+}
+
+function clearTranscript() {
+  document.getElementById('tx-body').innerHTML = '<div class="empty-state" id="tx-empty"><div class="empty-icon">📡</div><div class="empty-title">Cleared</div></div>';
+  ST.segCount = 0;
+  document.getElementById('sb-segs').textContent = '0';
+  document.getElementById('tx-count').textContent = '0 segments';
+}
+
+function copyLastAnswer() {
+  const cards = document.querySelectorAll('.ac-body');
+  if (!cards.length) { toast('No answers yet', 'err'); return; }
+  navigator.clipboard.writeText(cards[cards.length-1].textContent).then(() => toast('Copied', 'ok'));
+}
+
+function clearAnswers() {
+  document.getElementById('ans-body').innerHTML = '<div class="empty-state" id="ans-empty"><div class="empty-icon">⚡</div><div class="empty-title">Cleared</div></div>';
+  ST.ansCount = 0;
+  cardNum = 0;
+  document.getElementById('sb-ans').textContent = '0';
+  document.getElementById('ans-count').textContent = '0 answers';
+}
+
 let toastTimer;
 function toast(msg, type='') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.className = type;
+  t.className = type ? `show ${type}` : 'show';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.textContent = '', 3000);
+  toastTimer = setTimeout(() => t.className = '', 3200);
 }
 
-// Utility
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// Modal starts hidden, show on load
-// document.getElementById('modal-overlay').classList.add('hidden');
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (document.getElementById('modal-overlay').classList.contains('hidden') === false) return;
+  if (e.code === 'Space') { e.preventDefault(); document.getElementById('btn-capture').click(); }
+  if (e.code === 'KeyC' && e.ctrlKey) copyLastAnswer();
+});
 </script>
+</body>
+</html>
