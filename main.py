@@ -166,6 +166,54 @@ def is_duplicate_transcript(text: str) -> bool:
     return False
 
 
+def should_generate_answer(text: str) -> bool:
+    """Check if text is a substantial question worth generating an answer for."""
+    if not text:
+        return False
+
+    text_lower = text.lower().strip()
+    words = text_lower.split()
+
+    if len(words) < 6:
+        return False
+
+    QUESTION_STARTERS = frozenset(
+        (
+            "tell me",
+            "can you",
+            "could you",
+            "would you",
+            "describe",
+            "explain",
+            "walk me through",
+            "what is",
+            "what are",
+            "what was",
+            "how do",
+            "how did",
+            "how would",
+            "how have",
+            "why did",
+            "why do",
+            "have you ever",
+            "do you have",
+            "what's your",
+            "give me an example",
+            "talk me through",
+            "what experience",
+            "how would you",
+            "when have you",
+            "where do you see",
+        )
+    )
+
+    has_question_mark = "?" in text
+    starts_with_prompt = any(text_lower.startswith(s) for s in QUESTION_STARTERS)
+    is_long_enough = len(words) >= 8
+
+    return has_question_mark or (starts_with_prompt and is_long_enough)
+
+
 HALLUCINATION_EXTENDED = frozenset(
     {
         "thank you.",
@@ -711,29 +759,34 @@ async def groq_transcription_worker():
                     await connection_manager.broadcast_to_ui(transcript_payload)
                     logger.info(f"[HUD_RELAY] Transcript broadcast complete")
 
-                # 6. Async Shield: Non-blocking LLM call
+                # 6. Gate LLM call - only generate for substantial questions
                 words = text.split()
-                conversation_history.append(text)
+                if not should_generate_answer(text):
+                    logger.info(
+                        f"[GROQ_WORKER] Skipping LLM - not a substantial question: '{text[:50]}...'"
+                    )
+                else:
+                    conversation_history.append(text)
 
-                logger.info(
-                    f"[GROQ_WORKER] Words: {len(words)}, firing Ollama async..."
-                )
+                    logger.info(
+                        f"[GROQ_WORKER] Words: {len(words)}, firing Ollama async..."
+                    )
 
-                # Generate fresh utterance_id for next speech BEFORE async task
-                current_utterance_id = str(uuid.uuid4())
+                    # Generate fresh utterance_id for next speech BEFORE async task
+                    current_utterance_id = str(uuid.uuid4())
 
-                # Fire and forget - don't await, use create_task
-                async def safe_ollama_call():
-                    try:
-                        # Pass last 3 segments as context for better RAG
-                        await process_brain_ollama(text, transcript_history)
-                    except Exception as e:
-                        logger.error(f"[GROQ_WORKER] Ollama failed: {e}")
-                        await connection_manager.broadcast(
-                            "ui", {"type": "copilot_final", "text": "LLM Busy..."}
-                        )
+                    # Fire and forget - don't await, use create_task
+                    async def safe_ollama_call():
+                        try:
+                            # Pass last 3 segments as context for better RAG
+                            await process_brain_ollama(text, transcript_history)
+                        except Exception as e:
+                            logger.error(f"[GROQ_WORKER] Ollama failed: {e}")
+                            await connection_manager.broadcast(
+                                "ui", {"type": "copilot_final", "text": "LLM Busy..."}
+                            )
 
-                asyncio.create_task(safe_ollama_call())
+                    asyncio.create_task(safe_ollama_call())
 
         except Exception as e:
             logger.error(f"[GROQ_WORKER] Error: {e}")

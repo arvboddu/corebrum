@@ -1129,8 +1129,16 @@ function removeEmpty(panel) {
 function detectQuestion(text) {
   const qText = document.getElementById('q-text');
   const qBtn = document.getElementById('q-gen-btn');
-  const qWords = /^(tell me|can you|could you|what|how|why|describe|explain|walk me|have you|do you|would you|list|give me)/i;
-  if (qWords.test(text) || text.includes('?')) {
+  
+  const QUESTION_TRIGGERS = /^(tell me|can you|could you|what|how|why|describe|explain|walk me|have you|do you|would you|list|give me|would you|should you)/i;
+  const IGNORE_PATTERNS = /^(um|uh|hmm|okay|ok|right|so|well|yeah|yes|no|sure|let me|i see|i think|actually|basically)\s*\.?$/i;
+  
+  const words = text.split(/\s+/);
+  const isQuestion = QUESTION_TRIGGERS.test(text) || text.includes('?');
+  const isSubstantial = words.length >= 8;
+  const isFiller = IGNORE_PATTERNS.test(text.toLowerCase());
+  
+  if (!isFiller && (isQuestion || isSubstantial)) {
     qText.textContent = text;
     qText.classList.add('detected');
     qBtn.classList.add('show');
@@ -1139,6 +1147,7 @@ function detectQuestion(text) {
     qText.textContent = 'Listening...';
     qText.classList.remove('detected');
     qBtn.classList.remove('show');
+    ST.pendingQuestion = '';
   }
 }
 
@@ -1212,16 +1221,45 @@ async function generateAnswer(question) {
 }
 
 function buildSystemPrompt(context) {
-  const parts = [
-    'You are an interview copilot. Provide helpful, concise answers.',
-    context && `Context: ${context}`,
-    CFG.jobDesc && `Job Description: ${CFG.jobDesc}`,
-    CFG.thinkingMode && 'Use deep reasoning.',
-    `Answer length: ${CFG.answerLength}`,
-    `Tone: ${CFG.answerTone}`
-  ].filter(Boolean);
-  return parts.join('\n');
-}
+  const role = CFG.role || 'job candidate';
+  const jd = CFG.jobDesc || '';
+  const tone = CFG.answerTone || 'Professional';
+  const length = CFG.answerLength || 'Paragraph';
+  const thinking = CFG.thinkingMode;
+  
+  const jdBlock = jd ? `\n\nJob Description (tailor answers to this role):\n${jd.slice(0, 1500)}` : '';
+  const ctxBlock = context && context !== role ? `\n\nContext: ${context}` : '';
+  
+  const lengthGuide = {
+    'Short Answer': 'Answer in 1-2 sentences only. Be extremely concise.',
+    'Paragraph': 'Answer in 2-3 focused paragraphs. One key point each.',
+    'Bullet Points': 'Answer in 4-6 bullet points, one sentence each.',
+    'Elaborated': 'Answer in 4-5 detailed paragraphs with specific examples and metrics.'
+  }[length] || 'Answer in 2-3 focused paragraphs.';
+  
+  const toneGuide = {
+    'Professional': 'Polished, composed, confident. Senior-professional register.',
+    'Assertive': 'Direct and decisive. Lead with conclusions, then support.',
+    'Friendly': 'Warm and personable. Approachable but credible.'
+  }[tone] || 'Polished and professional.';
+  
+  const thinkingNote = thinking ? '\n\nThinking mode: Reason step-by-step internally, then output only the final answer.' : '';
+  
+  return `You are coaching a ${role} candidate in a live job interview.${jdBlock}${ctxBlock}
+
+You are a real-time interview copilot. Generate the best possible answer to the question being asked.
+
+Rules:
+- Answer DIRECTLY. No preamble like "Great question" or "Sure!".
+- Behavioural questions → STAR format (Situation, Task, Action, Result).
+- Technical questions → clear explanation + concrete example from experience.
+- Use specific background when available.
+- If the input is unclear, answer the most likely intended question.
+
+Format: ${lengthGuide}
+Tone: ${toneGuide}${thinkingNote}
+
+Respond ONLY with the answer. Nothing else.`;
 
 function anySignal(signals) {
   const ctrl = new AbortController();
