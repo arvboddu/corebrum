@@ -223,6 +223,7 @@
   }
 
   .tx-entry { display: flex; flex-direction: column; gap: 3px; }
+  .tx-entry.finalized .blink-cursor { display: none; }
   .tx-meta { display: flex; align-items: center; gap: 6px; }
   .tx-who { font-size: 9px; font-weight: 600; color: var(--blue-text); text-transform: uppercase; letter-spacing: 0.05em; }
   .tx-who.them { color: var(--text3); }
@@ -861,26 +862,8 @@ function connectBackendWS() {
 }
 
 function handleBackendTranscript(msg) {
-  const uid = msg.utterance_id || msg.id || Date.now().toString();
-  if (!msg.is_final) {
-    if (!ST._backendLiveNodes) ST._backendLiveNodes = {};
-    if (!ST._backendLiveNodes[uid]) {
-      ST._backendLiveNodes[uid] = addTxEntry(msg.text, 'live', msg.speaker || 'YOU');
-    } else {
-      const b = ST._backendLiveNodes[uid].querySelector('.tx-bubble');
-      if (b) b.innerHTML = esc(msg.text) + '<span class="blink-cursor"></span>';
-    }
-  } else {
-    if (ST._backendLiveNodes && ST._backendLiveNodes[uid]) {
-      const el = ST._backendLiveNodes[uid];
-      const b = el.querySelector('.tx-bubble');
-      const t = el.querySelector('.tx-type');
-      if (b) b.textContent = msg.text;
-      if (t) { t.textContent = 'FINAL'; t.className = 'tx-type final'; }
-      delete ST._backendLiveNodes[uid];
-    } else {
-      addTxEntry(msg.text, 'final', msg.speaker || 'YOU');
-    }
+  updateOrCreateBubble(msg);
+  if (msg.is_final) {
     detectQuestion(msg.text);
   }
 }
@@ -1100,11 +1083,12 @@ function startSpeechRecognition() {
   rec.start();
 }
 
-function addTxEntry(text, type, speaker) {
+function addTxEntry(text, type, speaker, uid = null) {
   removeEmpty('tx');
   const body = document.getElementById('tx-body');
   const entry = document.createElement('div');
   entry.className = 'tx-entry';
+  if (uid) entry.id = 'msg-' + uid;
   entry.innerHTML = `<div class="tx-meta"><span class="tx-who ${speaker === 'YOU' ? '' : 'them'}">${speaker}</span><span class="tx-ts">${new Date().toLocaleTimeString()}</span><span class="tx-type ${type}">${type.toUpperCase()}</span></div><div class="tx-bubble ${type}">${esc(text)}</div>`;
   body.appendChild(entry);
   body.scrollTop = body.scrollHeight;
@@ -1112,6 +1096,29 @@ function addTxEntry(text, type, speaker) {
   document.getElementById('sb-segs').textContent = ST.segCount;
   document.getElementById('tx-count').textContent = `${ST.segCount} segments`;
   return entry;
+}
+
+function updateOrCreateBubble(msg) {
+  const uid = msg.utterance_id || msg.id || Date.now().toString();
+  const existing = document.getElementById('msg-' + uid);
+  
+  if (existing) {
+    const bubble = existing.querySelector('.tx-bubble');
+    const typeLabel = existing.querySelector('.tx-type');
+    if (bubble) {
+      if (msg.is_final) {
+        bubble.innerHTML = esc(msg.text);
+        existing.classList.add('finalized');
+        if (typeLabel) { typeLabel.textContent = 'FINAL'; typeLabel.className = 'tx-type final'; }
+      } else {
+        bubble.innerHTML = esc(msg.text) + '<span class="blink-cursor"></span>';
+      }
+    }
+    return existing;
+  } else {
+    const type = msg.is_final ? 'final' : 'live';
+    return addTxEntry(msg.text, type, msg.speaker || 'YOU', uid);
+  }
 }
 
 function removeEmpty(panel) {
