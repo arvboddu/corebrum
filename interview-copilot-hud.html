@@ -1485,7 +1485,10 @@ const ST = {
   wsUi: null,
   wsReconnectDelay: 1000,
   wsReconnectTimer: null,
-  resumeIndexed: false
+  resumeIndexed: false,
+  // State manager for deduplication
+  finalizedIds: new Set(),
+  _backendLiveNodes: {}
 };
 
 // ===
@@ -1680,27 +1683,62 @@ function connectBackendWS() {
 }
 
 function handleBackendTranscript(msg) {
-  // Backend sends utterance_id for stable deduplication
-  const uid = msg.utterance_id || msg.id || Date.now().toString();
+  // Fail-safe ID: Generate temp hash if missing
+  let uid = msg.utterance_id || msg.id;
+  if (!uid) {
+    // Generate hash from text as fallback
+    uid = 'txt-' + (msg.text || '').slice(0, 20).replace(/\s+/g, '-');
+  }
+  
+  // Deduplication Set: Discard if already finalized
+  if (ST.finalizedIds.has(uid)) {
+    console.log('[HUD] Discarding duplicate:', uid);
+    return;
+  }
+  
+  // Update-or-Create: Check DOM by id
+  const existingEl = document.getElementById('tx-' + uid);
+  
   if (!msg.is_final) {
-    if (!ST._backendLiveNodes) ST._backendLiveNodes = {};
-    if (!ST._backendLiveNodes[uid]) {
-      ST._backendLiveNodes[uid] = addTxEntry(msg.text, 'live', msg.speaker || 'YOU');
+    // Live transcript update
+    if (existingEl) {
+      const bubble = existingEl.querySelector('.tx-bubble');
+      if (bubble) {
+        bubble.innerHTML = esc(msg.text) + '<span class="blink-cursor"></span>';
+      }
     } else {
-      const b = ST._backendLiveNodes[uid].querySelector('.tx-bubble');
-      if (b) b.innerHTML = esc(msg.text) + '<span class="blink-cursor"></span>';
+      // Create new bubble
+      const el = addTxEntry(msg.text, 'live', msg.speaker || 'YOU');
+      el.id = 'tx-' + uid;
+      ST._backendLiveNodes[uid] = el;
     }
   } else {
-    if (ST._backendLiveNodes && ST._backendLiveNodes[uid]) {
-      const el = ST._backendLiveNodes[uid];
-      const b = el.querySelector('.tx-bubble');
-      const t = el.querySelector('.tx-type');
-      if (b) b.textContent = msg.text;
-      if (t) { t.textContent = 'FINAL'; t.className = 'tx-type final'; }
-      delete ST._backendLiveNodes[uid];
+    // Finalization: Add to Set, change CSS class, stop animation
+    ST.finalizedIds.add(uid);
+    
+    if (existingEl) {
+      const bubble = existingEl.querySelector('.tx-bubble');
+      const typeLabel = existingEl.querySelector('.tx-type');
+      if (bubble) {
+        bubble.textContent = msg.text;
+        bubble.innerHTML = esc(msg.text); // Remove blink cursor
+      }
+      if (typeLabel) {
+        typeLabel.textContent = 'FINAL';
+        typeLabel.className = 'tx-type final';
+      }
+      existingEl.classList.add('finalized');
+      existingEl.classList.remove('live');
     } else {
-      addTxEntry(msg.text, 'final', msg.speaker || 'YOU');
+      // Create final bubble if doesn't exist
+      const el = addTxEntry(msg.text, 'final', msg.speaker || 'YOU');
+      el.id = 'tx-' + uid;
     }
+    
+    // Clean up live node tracking
+    delete ST._backendLiveNodes[uid];
+    
+    // Trigger question detection
     detectQuestion(msg.text);
   }
 }
