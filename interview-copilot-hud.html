@@ -1644,6 +1644,10 @@ function connectBackendWS() {
       ST.wsReconnectDelay = 1000;
       toast('Connected to Corebrum backend', 'ok');
       CFG.useBackend = true;
+      // State Guard: Resume capturing if we were capturing
+      if (ST.capturing) {
+        setChip('stt', 'live');
+      }
       console.log('[WS] Connected to backend!');
     };
     ws.onerror = (e) => {
@@ -1654,7 +1658,6 @@ function connectBackendWS() {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'transcript') {
-          // Backend sends transcripts - override browser STT display
           handleBackendTranscript(msg);
         } else if (msg.type === 'advice' || msg.type === 'answer') {
           handleBackendAnswer(msg);
@@ -1666,10 +1669,21 @@ function connectBackendWS() {
 
     ws.onclose = () => {
       CFG.useBackend = false;
-      // Auto-reconnect with exponential backoff
+      // State Guard: Mark capturing lost, STT chips red
+      if (ST.capturing) {
+        setChip('stt', 'err');
+      }
+      ST.capturing = false;
+      
+      // Clear any previous timer before starting new one
       clearTimeout(ST.wsReconnectTimer);
+      
+      // Exponential backoff: 1s, 2s, 4s... up to 10s (10000ms)
+      ST.wsReconnectDelay = Math.min(ST.wsReconnectDelay * 2, 10000);
+      ST.wsReconnectDelay = Math.max(ST.wsReconnectDelay, 1000);
+      
+      console.log(`[WS] Reconnecting in ${ST.wsReconnectDelay}ms...`);
       ST.wsReconnectTimer = setTimeout(() => {
-        ST.wsReconnectDelay = Math.min(ST.wsReconnectDelay * 1.5, 15000);
         connectBackendWS();
       }, ST.wsReconnectDelay);
     };
@@ -1677,7 +1691,6 @@ function connectBackendWS() {
     ws.onerror = () => ws.close();
     ST.wsUi = ws;
   } catch(e) {
-    // Backend not running - continue in browser-only mode
     CFG.useBackend = false;
   }
 }
