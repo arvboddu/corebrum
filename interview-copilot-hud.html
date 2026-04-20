@@ -1633,6 +1633,7 @@ function onLaunched() {
 // ===
 function connectBackendWS() {
   const wsUrl = CFG.backendUrl.replace('http', 'ws') + '/ws/ui';
+  console.log('[WS] Attempting to connect to:', wsUrl);
   try {
     const ws = new WebSocket(wsUrl);
 
@@ -1640,6 +1641,10 @@ function connectBackendWS() {
       ST.wsReconnectDelay = 1000;
       toast('Connected to Corebrum backend', 'ok');
       CFG.useBackend = true;
+      console.log('[WS] Connected to backend!');
+    };
+    ws.onerror = (e) => {
+      console.error('[WS] Error:', e);
     };
 
     ws.onmessage = (event) => {
@@ -2456,7 +2461,8 @@ function esc(s) {
 // Keyboard: Spacebar = toggle capture (when not in input)
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if (document.getElementById('modal-overlay').style.display !== 'none') return;
+  const modal = document.getElementById('modal-overlay');
+  if (modal && modal.style.display !== 'none') return;
   if (e.code === 'Space') { e.preventDefault(); document.getElementById('btn-capture').click(); }
   if (e.code === 'KeyC' && e.ctrlKey) { copyLastAnswer(); }
 });
