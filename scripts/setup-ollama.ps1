@@ -41,18 +41,37 @@ if ($models -match "llama3\.2:3b") {
     }
 }
 
-# Step 3: Verify Ollama is running
-Write-Host "`n[3/3] Verifying Ollama is running..." -ForegroundColor Yellow
-try {
-    $response = Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -TimeoutSec 3
-    $modelsList = $response.models | ForEach-Object { $_.name }
-    Write-Host "  -> Ollama is running" -ForegroundColor Green
-    Write-Host "  -> Available models: $($modelsList -join ', ')" -ForegroundColor Cyan
-} catch {
-    Write-Host "  -> Ollama not responding. Starting..." -ForegroundColor Yellow
-    Start-Process -FilePath "ollama" -ArgumentList "serve" -NoNewWindow
-    Start-Sleep -Seconds 3
-    Write-Host "  -> Ollama started" -ForegroundColor Green
+# Step 3: Verify or start Ollama service
+Write-Host "`n[3/3] Verifying Ollama is running at http://localhost:11434..." -ForegroundColor Yellow
+
+function Test-OllamaService {
+    try {
+        $response = Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -TimeoutSec 3
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+if (Test-OllamaService) {
+    Write-Host "  -> Ollama is responsive" -ForegroundColor Green
+} else {
+    Write-Host "  -> Ollama not responsive. Starting ollama serve..." -ForegroundColor Yellow
+    
+    # Try to start ollama serve
+    try {
+        Start-Process -FilePath "ollama" -ArgumentList "serve" -NoNewWindow -ErrorAction Stop
+        Start-Sleep -Seconds 5
+        
+        # Verify it started
+        if (Test-OllamaService) {
+            Write-Host "  -> Ollama service started successfully" -ForegroundColor Green
+        } else {
+            Write-Host "  -> WARNING: Could not auto-start. Run 'ollama serve' manually" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "  -> ERROR: Failed to start Ollama: $_" -ForegroundColor Red
+    }
 }
 
 Write-Host "`n======================================" -ForegroundColor Cyan
