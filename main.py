@@ -787,9 +787,12 @@ async def groq_transcription_worker():
                         f"[HUD_RELAY] Transcript broadcast complete (ID: {transcript_payload['utterance_id']})"
                     )
 
-                # 6. Non-Blocking AI Task: wrap in asyncio.create_task()
+                # 6. Interviewer Priority + Non-Blocking AI Task
                 words = text.split()
-                if not should_generate_answer(text):
+                is_interviewer = inferred_speaker == "INTERVIEWER"
+
+                # Trigger AI immediately for INTERVIEWER questions
+                if not should_generate_answer(text) and not is_interviewer:
                     logger.info(
                         f"[GROQ_WORKER] Skipping LLM - not a substantial question: '{text[:50]}...'"
                     )
@@ -797,7 +800,7 @@ async def groq_transcription_worker():
                     conversation_history.append(text)
 
                     logger.info(
-                        f"[GROQ_WORKER] Words: {len(words)}, firing Ollama async..."
+                        f"[GROQ_WORKER] Speaker: {inferred_speaker}, Words: {len(words)}, firing Ollama async..."
                     )
 
                     # Non-blocking: wrap in create_task() so AI never blocks heartbeat
