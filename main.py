@@ -1,3 +1,5 @@
+# type: ignore[type-arg]
+# pyright: reportUnknownMemberType=false
 import asyncio
 import json
 import logging
@@ -452,7 +454,7 @@ class KnowledgeBase:
         ).astype("float32")
 
         k = top_k
-        distances, indices = self.index.search(query_emb, k)
+        distances, indices = self.index.search(query_emb, k)  # type: ignore[attr-defined]
         results = []
         for score, idx in zip(distances[0], indices[0]):
             if 0 <= idx < len(self.metadata):
