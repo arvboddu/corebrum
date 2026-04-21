@@ -1495,6 +1495,7 @@ const ST = {
   _backendActive: false,
   _backendTranscriptReceived: false,
   _backendLiveNodes: {},
+  finalizedIds: new Set(),
   _backendCard: null,
   _lastTranscriptTime: null,
   _watchdogInterval: null
@@ -1691,28 +1692,43 @@ function handleBackendTranscript(msg) {
   resetWatchdog();
 
   // Suppress browser STT interim display while backend is healthy
-  // (browser final entries stay as baseline - backend will override/supplement)
   ST._backendActive = true;
 
-  const uid = msg.utterance_id || msg.id || Date.now().toString();
+  // Fail-safe: Generate ID from text hash if missing
+  let uid = msg.utterance_id || msg.id;
+  if (!uid) {
+    uid = 'txt-' + (msg.text || '').slice(0, 20).replace(/\s+/g, '-');
+  }
+  
+  // Idempotency Set: Discard if already finalized
+  if (!msg.is_final && ST.finalizedIds && ST.finalizedIds.has(uid)) {
+    console.log('[HUD] Discarding duplicate interim for:', uid);
+    return;
+  }
+  
+  // DOM Management: Check if element exists
+  const existingEl = document.getElementById('tx-' + uid);
+  
   if (!msg.is_final) {
-    if (!ST._backendLiveNodes) ST._backendLiveNodes = {};
-    if (!ST._backendLiveNodes[uid]) {
-      ST._backendLiveNodes[uid] = addTxEntry(msg.text, 'live', msg.speaker || 'YOU');
-    } else {
-      const b = ST._backendLiveNodes[uid].querySelector('.tx-bubble');
+    if (existingEl) {
+      const b = existingEl.querySelector('.tx-bubble');
       if (b) b.innerHTML = esc(msg.text) + '<span class="blink-cursor"></span>';
+    } else {
+      const el = addTxEntry(msg.text, 'live', msg.speaker || 'YOU');
+      el.id = 'tx-' + uid;
     }
   } else {
-    if (ST._backendLiveNodes && ST._backendLiveNodes[uid]) {
-      const el = ST._backendLiveNodes[uid];
-      const b = el.querySelector('.tx-bubble');
-      const t = el.querySelector('.tx-type');
+    // Add to finalized Set
+    if (ST.finalizedIds) ST.finalizedIds.add(uid);
+    
+    if (existingEl) {
+      const b = existingEl.querySelector('.tx-bubble');
+      const t = existingEl.querySelector('.tx-type');
       if (b) b.textContent = msg.text;
       if (t) { t.textContent = 'FINAL'; t.className = 'tx-type final'; }
-      delete ST._backendLiveNodes[uid];
     } else {
-      addTxEntry(msg.text, 'final', msg.speaker || 'YOU');
+      const el = addTxEntry(msg.text, 'final', msg.speaker || 'YOU');
+      el.id = 'tx-' + uid;
     }
     detectQuestion(msg.text);
   }
@@ -2160,7 +2176,7 @@ function startTranscriptWatchdog() {
       // Reconnect audio after short delay
       setTimeout(() => {
         if (ST.capturing && CFG.useBackend) {
-          connectAudioWS();
+          connectAudioWebSocket();
         }
       }, 1000);
       
