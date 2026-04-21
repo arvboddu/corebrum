@@ -487,16 +487,6 @@ body::after {
   letter-spacing: 0.1em;
 }
 
-#vis-source-label.listening {
-  animation: pulse-text 1s ease-in-out infinite;
-  color: var(--teal);
-}
-
-@keyframes pulse-text {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
 #vis-level-text {
   font-size: 9px;
   color: var(--text-low);
@@ -1437,6 +1427,7 @@ body::after {
   <div class="sb-seg">Segs <span class="sb-val accent" id="sb-segs">0</span></div>
   <div class="sb-seg">Answers <span class="sb-val accent" id="sb-ans">0</span></div>
   <div class="sb-seg">Source <span class="sb-val" id="sb-src">-</span></div>
+  <div class="sb-seg">STT <span class="sb-val" id="sb-stt-mode" style="color:var(--amber)">Browser</span></div>
   <div id="sb-context-wrap">
     <span id="sb-context-label">Context</span>
     <input id="sb-context-input" placeholder="Add extra context for the AI (job description, tech stack…)"/>
@@ -1491,15 +1482,22 @@ const ST = {
   recognition: null,
   rafId: null,
   waveHistory: new Array(80).fill(0),
-// WebSocket reconnect
+  // WebSocket reconnect
   wsUi: null,
-  wsAudio: null,
   wsReconnectDelay: 1000,
   wsReconnectTimer: null,
   resumeIndexed: false,
-  finalizedIds: new Set(),
+  // Backend audio WS + processor
+  _wsAudio: null,
+  _audioProcessor: null,
+  _audioProcessorSource: null,
+  // Backend transcript tracking
+  _backendActive: false,
+  _backendTranscriptReceived: false,
   _backendLiveNodes: {},
-  _audioProcessor: null
+  _backendCard: null,
+  _lastTranscriptTime: null,
+  _watchdogInterval: null
 };
 
 // ===
@@ -1647,7 +1645,6 @@ function onLaunched() {
 // ===
 function connectBackendWS() {
   const wsUrl = CFG.backendUrl.replace('http', 'ws') + '/ws/ui';
-  console.log('[WS] Attempting to connect to:', wsUrl);
   try {
     const ws = new WebSocket(wsUrl);
 
@@ -1655,20 +1652,13 @@ function connectBackendWS() {
       ST.wsReconnectDelay = 1000;
       toast('Connected to Corebrum backend', 'ok');
       CFG.useBackend = true;
-      // State Guard: Resume capturing if we were capturing
-      if (ST.capturing) {
-        setChip('stt', 'live');
-      }
-      console.log('[WS] Connected to backend!');
-    };
-    ws.onerror = (e) => {
-      console.error('[WS] Error:', e);
     };
 
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'transcript') {
+          // Backend sends transcripts - override browser STT display
           handleBackendTranscript(msg);
         } else if (msg.type === 'advice' || msg.type === 'answer') {
           handleBackendAnswer(msg);
@@ -1680,21 +1670,10 @@ function connectBackendWS() {
 
     ws.onclose = () => {
       CFG.useBackend = false;
-      // State Guard: Mark capturing lost, STT chips red
-      if (ST.capturing) {
-        setChip('stt', 'err');
-      }
-      ST.capturing = false;
-      
-      // Clear any previous timer before starting new one
+      // Auto-reconnect with exponential backoff
       clearTimeout(ST.wsReconnectTimer);
-      
-      // Exponential backoff: 1s, 2s, 4s... up to 10s (10000ms)
-      ST.wsReconnectDelay = Math.min(ST.wsReconnectDelay * 2, 10000);
-      ST.wsReconnectDelay = Math.max(ST.wsReconnectDelay, 1000);
-      
-      console.log(`[WS] Reconnecting in ${ST.wsReconnectDelay}ms...`);
       ST.wsReconnectTimer = setTimeout(() => {
+        ST.wsReconnectDelay = Math.min(ST.wsReconnectDelay * 1.5, 15000);
         connectBackendWS();
       }, ST.wsReconnectDelay);
     };
@@ -1702,110 +1681,39 @@ function connectBackendWS() {
     ws.onerror = () => ws.close();
     ST.wsUi = ws;
   } catch(e) {
+    // Backend not running - continue in browser-only mode
     CFG.useBackend = false;
   }
 }
 
-// Audio WebSocket for streaming to backend
-function connectAudioWS() {
-  if (ST.wsAudio && ST.wsAudio.readyState === WebSocket.OPEN) return;
-  
-  const wsUrl = CFG.backendUrl.replace('http', 'ws') + '/ws/audio';
-  console.log('[WS_AUDIO] Connecting to:', wsUrl);
-  
-  try {
-    const ws = new WebSocket(wsUrl);
-    ws.onopen = () => {
-      console.log('[WS_AUDIO] Connected!');
-      toast('Audio stream connected', 'ok');
-    };
-    ws.onclose = () => {
-      ST.wsAudio = null;
-      console.log('[WS_AUDIO] Disconnected');
-    };
-    ws.onerror = (e) => {
-      console.error('[WS_AUDIO] Error:', e);
-    };
-    ST.wsAudio = ws;
-  } catch(e) {
-    console.error('[WS_AUDIO] Failed to connect:', e);
-  }
-}
-
-function sendAudioChunk(audioData) {
-  if (ST.wsAudio && ST.wsAudio.readyState === WebSocket.OPEN) {
-    // Debug: log audio buffer size
-    console.log('[WS_AUDIO] Sending buffer size:', audioData.byteLength || audioData.length);
-    ST.wsAudio.send(audioData);
-  }
-}
-
 function handleBackendTranscript(msg) {
-  // Fail-safe ID: Generate temp hash if missing
-  let uid = msg.utterance_id || msg.id;
-  if (!uid) {
-    uid = 'txt-' + (msg.text || '').slice(0, 20).replace(/\s+/g, '-');
-  }
-  
-  // Deduplication Set: Discard if already finalized (Drop Rule)
-  if (ST.finalizedIds.has(uid)) {
-    console.log('[HUD] Discarding duplicate final:', uid);
-    return;
-  }
-  
-  // Speaker Lock: Check if this turn was already locked as INTERVIEWER
-  const existingEl = document.getElementById('tx-' + uid);
-  let speakerLocked = false;
-  if (existingEl) {
-    const whoLabel = existingEl.querySelector('.tx-who');
-    if (whoLabel && whoLabel.classList.contains('them')) {
-      speakerLocked = true;
-    }
-  }
-  
-  // Determine speaker (use locked speaker or use incoming)
-  const speaker = speakerLocked ? 'INTERVIEWER' : (msg.speaker || 'YOU');
-  
+  // Reset watchdog - backend IS sending transcripts
+  resetWatchdog();
+
+  // Suppress browser STT interim display while backend is healthy
+  // (browser final entries stay as baseline - backend will override/supplement)
+  ST._backendActive = true;
+
+  const uid = msg.utterance_id || msg.id || Date.now().toString();
   if (!msg.is_final) {
-    // Live transcript update
-    if (existingEl) {
-      const bubble = existingEl.querySelector('.tx-bubble');
-      if (bubble) {
-        bubble.innerHTML = esc(msg.text) + '<span class="blink-cursor"></span>';
-      }
+    if (!ST._backendLiveNodes) ST._backendLiveNodes = {};
+    if (!ST._backendLiveNodes[uid]) {
+      ST._backendLiveNodes[uid] = addTxEntry(msg.text, 'live', msg.speaker || 'YOU');
     } else {
-      const el = addTxEntry(msg.text, 'live', speaker);
-      el.id = 'tx-' + uid;
-      ST._backendLiveNodes[uid] = el;
+      const b = ST._backendLiveNodes[uid].querySelector('.tx-bubble');
+      if (b) b.innerHTML = esc(msg.text) + '<span class="blink-cursor"></span>';
     }
   } else {
-    // Finalization: Add to Set, lock speaker, change CSS class
-    ST.finalizedIds.add(uid);
-    
-    if (existingEl) {
-      const bubble = existingEl.querySelector('.tx-bubble');
-      const typeLabel = existingEl.querySelector('.tx-type');
-      if (bubble) {
-        bubble.textContent = msg.text;
-        bubble.innerHTML = esc(msg.text);
-      }
-      if (typeLabel) {
-        typeLabel.textContent = 'FINAL';
-        typeLabel.className = 'tx-type final';
-      }
-      existingEl.classList.add('finalized');
-      existingEl.classList.remove('live');
+    if (ST._backendLiveNodes && ST._backendLiveNodes[uid]) {
+      const el = ST._backendLiveNodes[uid];
+      const b = el.querySelector('.tx-bubble');
+      const t = el.querySelector('.tx-type');
+      if (b) b.textContent = msg.text;
+      if (t) { t.textContent = 'FINAL'; t.className = 'tx-type final'; }
+      delete ST._backendLiveNodes[uid];
     } else {
-      const el = addTxEntry(msg.text, 'final', speaker);
-      el.id = 'tx-' + uid;
-      // Lock the speaker for this ID
-      if (speaker === 'INTERVIEWER') {
-        const whoLabel = el.querySelector('.tx-who');
-        if (whoLabel) whoLabel.classList.add('them');
-      }
+      addTxEntry(msg.text, 'final', msg.speaker || 'YOU');
     }
-    
-    delete ST._backendLiveNodes[uid];
     detectQuestion(msg.text);
   }
 }
@@ -1967,12 +1875,6 @@ function setBtnCapture(capturing) {
 //  START CAPTURE
 // ===
 async function startCapture() {
-  // Context Resume: Ensure audio context is not suspended
-  if (ST.audioCtx && ST.audioCtx.state === 'suspended') {
-    await ST.audioCtx.resume();
-    console.log('[CAPTURE] Resumed audio context');
-  }
-  
   setBtnCapture(true);
   ST.capturing = true;
   removeEmpty('tx');
@@ -2005,17 +1907,18 @@ async function startCapture() {
     mode === 'tab' ? '📺 Tab Audio' : mode === 'mic' ? '🎙 Microphone' : '🔀 Tab + Mic';
 
   setChip('stt', 'live');
-  setListeningIndicator(true);
-  if (!CFG.useBackend) {
-    console.log('[CAPTURE] Using browser Web Speech API (CFG.useBackend=false)');
-    startSpeechRecognition();
-  } else {
-    console.log('[CAPTURE] Using backend STT via WebSocket (CFG.useBackend=true)');
-    toast('Backend STT active - Corebrum handling transcription', 'info');
-    // Connect audio WebSocket if not already connected
-    if (!ST.wsAudio || ST.wsAudio.readyState !== WebSocket.OPEN) {
-      connectAudioWS();
-    }
+
+  // DUAL-MODE STT: Always start browser STT as foundation layer.
+  // Backend transcripts (faster-whisper) will OVERRIDE browser output when they arrive.
+  // This ensures transcripts appear even if backend pipeline stalls.
+  startSpeechRecognition();
+
+  if (CFG.useBackend) {
+    // Connect audio WebSocket to stream PCM to backend faster-whisper
+    connectAudioWebSocket();
+    // Start watchdog: if backend sends no transcript within 8s, warn user
+    startTranscriptWatchdog();
+    toast('Dual STT: browser + backend active', 'info');
   }
   toast('Capture started', 'ok');
 }
@@ -2082,53 +1985,6 @@ function setupAudioAnalyser(stream) {
   ST.analyser.fftSize = 512;
   source.connect(ST.analyser);
   drawLiveWave(ST.analyser);
-  // Set up audio worklet for streaming to backend
-  setupAudioWorklet(stream);
-}
-
-async function setupAudioWorklet(stream) {
-  if (!ST.audioCtx) return;
-  try {
-    const workletCode = `
-      class PCMProcessor extends AudioWorkletProcessor {
-        process(inputs, outputs, parameters) {
-          const input = inputs[0];
-          if (input && input.length > 0) {
-            const channelData = input[0];
-            // Threshold Check: Calculate RMS, skip if below 0.01
-            let sum = 0;
-            for (let i = 0; i < channelData.length; i++) {
-              sum += channelData[i] * channelData[i];
-            }
-            const rms = Math.sqrt(sum / channelData.length);
-            if (rms < 0.01) return true;  // Skip quiet audio
-            
-            const pcmData = new Int16Array(channelData.length);
-            for (let i = 0; i < channelData.length; i++) {
-              pcmData[i] = Math.max(-32768, Math.min(32767, Math.floor(channelData[i] * 32768)));
-            }
-            this.port.postMessage(pcmData.buffer, [pcmData.buffer]);
-          }
-          return true;
-        }
-      }
-      registerProcessor('pcm-processor', PCMProcessor);
-    `;
-    const blob = new Blob([workletCode], { type: 'application/javascript' });
-    const workletUrl = URL.createObjectURL(blob);
-    await ST.audioCtx.audioWorklet.addModule(workletUrl);
-    const pcmNode = new AudioWorkletNode(ST.audioCtx, 'pcm-processor');
-    pcmNode.port.onmessage = (e) => {
-      if (CFG.useBackend) sendAudioChunk(e.data);
-    };
-    const source = ST.audioCtx.createMediaStreamSource(stream);
-    source.connect(pcmNode);
-    pcmNode.connect(ST.audioCtx.destination);
-    ST._audioProcessor = { node: pcmNode, url: workletUrl };
-    console.log('[AUDIO] Worklet configured');
-  } catch (e) {
-    console.error('[AUDIO] Worklet failed:', e);
-  }
 }
 
 // ===
@@ -2138,12 +1994,40 @@ function stopCapture() {
   ST.capturing = false;
   setBtnCapture(false);
   setChip('stt', 'idle');
-  setListeningIndicator(false);
 
+  // Stop browser STT
   if (ST.recognition) { try { ST.recognition.stop(); } catch(e){} ST.recognition = null; }
+
+  // Stop audio streams
   if (ST.tabStream) { ST.tabStream.getTracks().forEach(t=>t.stop()); ST.tabStream = null; }
   if (ST.micStream) { ST.micStream.getTracks().forEach(t=>t.stop()); ST.micStream = null; }
-  if (ST.audioCtx)  { ST.audioCtx.close(); ST.audioCtx = null; ST.analyser = null; }
+
+  // Stop PCM processor
+  if (ST._audioProcessor) {
+    try { ST._audioProcessor.disconnect(); } catch(e){}
+    ST._audioProcessor = null;
+  }
+  if (ST._audioProcessorSource) {
+    try { ST._audioProcessorSource.disconnect(); } catch(e){}
+    ST._audioProcessorSource = null;
+  }
+
+  // Close audio context
+  if (ST.audioCtx) { ST.audioCtx.close(); ST.audioCtx = null; ST.analyser = null; }
+
+  // Close WS_AUDIO
+  if (ST._wsAudio) {
+    try { ST._wsAudio.close(); } catch(e){}
+    ST._wsAudio = null;
+  }
+
+  // Stop watchdog
+  clearInterval(ST._watchdogInterval);
+  ST._watchdogInterval = null;
+  ST._backendActive = false;
+  ST._backendTranscriptReceived = false;
+  const sttEl = document.getElementById('sb-stt-mode');
+  if (sttEl) { sttEl.textContent = 'Browser'; sttEl.style.color = 'var(--amber)'; }
 
   clearTimeout(ST.silenceTimer);
   if (ST.accumulated.trim()) {
@@ -2158,8 +2042,132 @@ function stopCapture() {
 }
 
 // ===
-//  WEB SPEECH API - core STT engine
+//  AUDIO WEBSOCKET - streams PCM to backend faster-whisper
+//  ROOT CAUSE 2 FIX: accumulates to 1s chunks (not 16ms) before sending
 // ===
+function connectAudioWebSocket() {
+  if (!CFG.useBackend) return;
+  const wsUrl = CFG.backendUrl.replace('http', 'ws') + '/ws/audio';
+  try {
+    const ws = new WebSocket(wsUrl);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+      console.log('[WS_AUDIO] Connected to backend audio endpoint');
+      ST._wsAudio = ws;
+      // Start the PCM processor now that WS is open
+      startAudioProcessor();
+    };
+
+    ws.onerror = (e) => {
+      console.warn('[WS_AUDIO] Error - backend audio unavailable, browser STT only');
+      ST._wsAudio = null;
+    };
+
+    ws.onclose = () => {
+      console.log('[WS_AUDIO] Disconnected');
+      ST._wsAudio = null;
+    };
+
+  } catch(e) {
+    console.warn('[WS_AUDIO] Could not connect:', e.message);
+    ST._wsAudio = null;
+  }
+}
+
+// ===
+//  PCM AUDIO PROCESSOR
+//  Accumulates Float32 audio into 1-second chunks before sending to backend.
+//  faster-whisper needs minimum ~800ms of audio to produce output reliably.
+// ===
+function startAudioProcessor() {
+  if (!ST.audioCtx || !ST._wsAudio) return;
+
+  const SAMPLE_RATE   = 16000;
+  const CHUNK_SAMPLES = SAMPLE_RATE * 1;   // 1 second per send
+  const accum         = new Float32Array(CHUNK_SAMPLES);
+  let   accumPos      = 0;
+
+  // ScriptProcessor: universally supported, accumulates to 1s before send
+  const processor = ST.audioCtx.createScriptProcessor(4096, 1, 1);
+
+  // Connect the appropriate stream source
+  const streamSource = ST.tabStream
+    ? ST.audioCtx.createMediaStreamSource(ST.tabStream)
+    : ST.micStream
+    ? ST.audioCtx.createMediaStreamSource(ST.micStream)
+    : null;
+
+  if (!streamSource) return;
+
+  processor.onaudioprocess = (e) => {
+    if (!ST._wsAudio || ST._wsAudio.readyState !== WebSocket.OPEN) return;
+
+    const input = e.inputBuffer.getChannelData(0);
+
+    // Accumulate samples
+    for (let i = 0; i < input.length; i++) {
+      accum[accumPos++] = input[i];
+
+      if (accumPos >= CHUNK_SAMPLES) {
+        // Convert Float32 → Int16 PCM (faster-whisper expects Int16)
+        const pcm16 = new Int16Array(CHUNK_SAMPLES);
+        for (let j = 0; j < CHUNK_SAMPLES; j++) {
+          const s = Math.max(-1, Math.min(1, accum[j]));
+          pcm16[j] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        ST._wsAudio.send(pcm16.buffer);
+        console.log(`[WS_AUDIO] Sent 1s PCM chunk: ${pcm16.buffer.byteLength} bytes`);
+        accumPos = 0;
+      }
+    }
+  };
+
+  streamSource.connect(processor);
+  processor.connect(ST.audioCtx.destination);
+  ST._audioProcessor = processor;
+  ST._audioProcessorSource = streamSource;
+  console.log('[AUDIO] PCM processor started - 1s chunk accumulation');
+}
+
+// ===
+//  TRANSCRIPT WATCHDOG
+//  ROOT CAUSE 4 FIX: Detects if backend is connected but sending no transcripts.
+//  After 8 seconds with no backend transcript, shows a warning and confirms
+//  that browser STT (already running) is the active source.
+// ===
+function startTranscriptWatchdog() {
+  ST._lastTranscriptTime = Date.now();
+  ST._backendTranscriptReceived = false;
+
+  clearInterval(ST._watchdogInterval);
+  ST._watchdogInterval = setInterval(() => {
+    if (!ST.capturing) {
+      clearInterval(ST._watchdogInterval);
+      return;
+    }
+    const elapsed = Date.now() - (ST._lastTranscriptTime || Date.now());
+
+    if (!ST._backendTranscriptReceived && elapsed > 8000) {
+      // Backend has been connected for 8s but sent zero transcripts
+      console.warn('[WATCHDOG] Backend connected but no transcripts in 8s');
+      showAlert(
+        'Backend connected but no transcripts received after 8s. ' +
+        'Browser STT (Web Speech API) is your active transcript source. ' +
+        'Check that faster-whisper is running: python main.py'
+      );
+      ST._lastTranscriptTime = Date.now(); // reset to not spam alerts
+    }
+  }, 8000);
+}
+
+function resetWatchdog() {
+  ST._lastTranscriptTime = Date.now();
+  ST._backendTranscriptReceived = true;
+  // Update STT mode indicator - backend is now confirmed active
+  const el = document.getElementById('sb-stt-mode');
+  if (el) { el.textContent = 'Backend'; el.style.color = 'var(--cyan)'; }
+}
 function startSpeechRecognition() {
   const SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SRClass) {
@@ -2187,16 +2195,19 @@ function startSpeechRecognition() {
     }
 
     if (finalChunk.trim()) {
-      // Remove live element
       if (ST.liveEl) { ST.liveEl.remove(); ST.liveEl = null; }
 
       ST.accumulated += finalChunk;
-      addTxEntry(finalChunk.trim(), 'final', detectSpeaker(finalChunk));
 
-      // Question detection
+      // Only show browser STT in transcript panel if backend is NOT sending transcripts.
+      // When backend is healthy (_backendActive=true), browser STT still feeds
+      // the LLM flush pipeline but we avoid showing duplicate transcript bubbles.
+      if (!ST._backendActive) {
+        addTxEntry(finalChunk.trim(), 'final', detectSpeaker(finalChunk));
+      }
+
       detectQuestion(ST.accumulated);
 
-      // Silence-gap flush: 2.5s of no new final speech - send to LLM
       clearTimeout(ST.silenceTimer);
       if (ST.accumulated.trim().length > 30) {
         ST.silenceTimer = setTimeout(() => {
@@ -2214,11 +2225,14 @@ function startSpeechRecognition() {
     }
 
     if (interim) {
-      if (!ST.liveEl) {
-        ST.liveEl = addTxEntry(interim, 'live', 'YOU');
-      } else {
-        const b = ST.liveEl.querySelector('.tx-bubble');
-        if (b) b.innerHTML = esc(interim) + '<span class="blink-cursor"></span>';
+      // Show interim only when backend is not active (fallback mode)
+      if (!ST._backendActive) {
+        if (!ST.liveEl) {
+          ST.liveEl = addTxEntry(interim, 'live', 'YOU');
+        } else {
+          const b = ST.liveEl.querySelector('.tx-bubble');
+          if (b) b.innerHTML = esc(interim) + '<span class="blink-cursor"></span>';
+        }
       }
       detectQuestion(interim);
     }
@@ -2339,7 +2353,9 @@ function flushToLLM(text) {
 //  LLM ANSWER GENERATION
 // ===
 async function generateAnswer(question) {
-  // Abort any in-flight request
+  // If backend is actively sending answers, it will handle via handleBackendAnswer().
+  // But we still run direct Ollama as fallback in case backend LLM pipeline stalls.
+  // The first card wins — if backend answers first, it creates its own card.
   if (ST.abortCtrl) ST.abortCtrl.abort();
   ST.generating = true;
   setChip('llm', 'proc');
@@ -2572,20 +2588,6 @@ function setChip(which, state) {
   if (state === 'err')   el.classList.add('err');
 }
 
-// UI Feedback: Toggle listening indicator
-function setListeningIndicator(active) {
-  const el = document.getElementById('vis-source-label');
-  if (el) {
-    if (active) {
-      el.textContent = 'Listening...';
-      el.classList.add('listening');
-    } else {
-      el.textContent = 'No audio';
-      el.classList.remove('listening');
-    }
-  }
-}
-
 // ===
 //  PANEL ACTION BUTTONS
 // ===
@@ -2641,8 +2643,7 @@ function esc(s) {
 // Keyboard: Spacebar = toggle capture (when not in input)
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  const modal = document.getElementById('modal-overlay');
-  if (modal && modal.style.display !== 'none') return;
+  if (document.getElementById('modal-overlay').style.display !== 'none') return;
   if (e.code === 'Space') { e.preventDefault(); document.getElementById('btn-capture').click(); }
   if (e.code === 'KeyC' && e.ctrlKey) { copyLastAnswer(); }
 });
