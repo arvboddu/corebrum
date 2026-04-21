@@ -2116,8 +2116,10 @@ function startAudioProcessor() {
           const s = Math.max(-1, Math.min(1, accum[j]));
           pcm16[j] = s < 0 ? s * 0x8000 : s * 0x7FFF;
         }
+        // Sample Verification: Check format
+        const expectedBytes = SAMPLE_RATE * 1 * 2; // 16kHz * 1s * 2 bytes (Int16) = 32000
+        console.log(`[WS_AUDIO] Sending PCM: ${pcm16.buffer.byteLength} bytes (expected: ${expectedBytes} bytes, 16kHz Mono)`);
         ST._wsAudio.send(pcm16.buffer);
-        console.log(`[WS_AUDIO] Sent 1s PCM chunk: ${pcm16.buffer.byteLength} bytes`);
         accumPos = 0;
       }
     }
@@ -2149,12 +2151,22 @@ function startTranscriptWatchdog() {
     const elapsed = Date.now() - (ST._lastTranscriptTime || Date.now());
 
     if (!ST._backendTranscriptReceived && elapsed > 8000) {
-      // Backend has been connected for 8s but sent zero transcripts
-      console.warn('[WATCHDOG] Backend connected but no transcripts in 8s');
+      // Auto-Reset: Close and re-open WS_AUDIO connection
+      console.warn('[WATCHDOG] 8s no transcripts - auto-resetting audio connection');
+      if (ST._wsAudio) {
+        try { ST._wsAudio.close(); } catch(e){}
+        ST._wsAudio = null;
+      }
+      // Reconnect audio after short delay
+      setTimeout(() => {
+        if (ST.capturing && CFG.useBackend) {
+          connectAudioWS();
+        }
+      }, 1000);
+      
       showAlert(
         'Backend connected but no transcripts received after 8s. ' +
-        'Browser STT (Web Speech API) is your active transcript source. ' +
-        'Check that faster-whisper is running: python main.py'
+        'Audio connection auto-reset. Check that faster-whisper is running.'
       );
       ST._lastTranscriptTime = Date.now(); // reset to not spam alerts
     }
