@@ -571,6 +571,7 @@ async def groq_transcription_worker():
     last_sent_text = ""
     current_transcript_buffer = ""
     last_speech_end_time = 0.0
+    last_audio_time = time.time()  # Track last audio for timeout
     TURN_SILENCE_GAP = 2.0  # 2 seconds of silence = new speech turn
 
     # Deduplication
@@ -636,12 +637,22 @@ async def groq_transcription_worker():
                 f"[WHISPER_WORKER] Got {data_len} bytes, total buffered: {len(audio_buffer)}"
             )
 
+            # Track time since last audio for timeout
+            time_since_last_audio = receive_time - last_audio_time
+
             # VAD: skip chunks with no voice activity
             has_speech, speech_level = detect_voice_activity(audio_data)
             if not has_speech:
-                logger.info("[WHISPER_WORKER] No voice activity, skipping chunk")
-                continue
+                # Timeout Fail-safe: If buffer has content and no speech for 3s, force flush
+                if audio_buffer and time_since_last_audio > 3.0:
+                    logger.info(
+                        "[WHISPER_WORKER] 3s silence gap - forcing buffer flush"
+                    )
+                else:
+                    logger.info("[WHISPER_WORKER] No voice activity, skipping chunk")
+                    continue
             logger.info(f"[VAD] Speech detected (Level: {speech_level:.1f})")
+            last_audio_time = receive_time
 
             audio_buffer.extend(audio_data)
 
