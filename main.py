@@ -501,7 +501,14 @@ def _run_whisper(model, audio_data):
         f.write(audio_data)
         temp_path = f.name
     try:
-        segments, info = model.transcribe(temp_path, language="en")
+        # Beam Size 5: Consider more alternatives for unclear accents
+        # Initial Prompt: Industry hints for technical terms
+        segments, info = model.transcribe(
+            temp_path,
+            language="en",
+            beam_size=5,
+            initial_prompt="wastewater, product management, engineering, KPIs, software development, agile, scrum, metrics, architecture, cloud, devops, CI/CD",
+        )
         result = ([s.text.strip() for s in segments], info)
     finally:
         os.unlink(temp_path)
