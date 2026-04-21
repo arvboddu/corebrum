@@ -1389,8 +1389,13 @@ async def websocket_audio(websocket: WebSocket):
                 chunk_counter += 1
                 data_len = len(data)
 
-                logger.info(f"[WS_AUDIO] Got {data_len} bytes (chunk #{chunk_counter})")
+                logger.info(
+                    f"[WS_AUDIO] Got {data_len} bytes (chunk #{chunk_counter}), queue size now: {transcript_queue.qsize()}"
+                )
                 await transcript_queue.put(data)
+                logger.info(
+                    f"[WS_AUDIO] Put in queue, queue size: {transcript_queue.qsize()}"
+                )
                 last_byte_time = time.time()
 
             elif msg.get("type") == "text":
