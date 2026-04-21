@@ -911,15 +911,15 @@ async def process_brain_ollama(transcript: str, context_segments: list[str] = No
         REWRITE_TIMEOUT = 0.8  # 800ms for LLM rewrite
 
         async def rephrase_for_search(query: str, history: list[str]) -> str:
-            """Rephrase transcript into standalone search query using LLM."""
+            """Rephrase transcript into formal search query for knowledge base."""
             context = " ".join(history[-3:]) if history else ""
-            rewrite_prompt = f"""Given this conversation history and current question, create a standalone search query that captures the key information need. 
+            rewrite_prompt = f"""Given the following transcript from a software/product interview: {query}
 
-History: {context}
+Extract the core technical question and rephrase it into a formal, clear search query for a knowledge base.
 
-Current: {query}
+Example: If it hears 'water aggregate', output 'Definition and role of aggregate in wastewater management systems.'
 
-Respond with ONLY the rephrased query. No explanation. 3-10 words."""
+Respond with ONLY the rephrased query. No explanation. 3-15 words."""
 
             try:
                 async with httpx.AsyncClient(timeout=REWRITE_TIMEOUT) as client:
